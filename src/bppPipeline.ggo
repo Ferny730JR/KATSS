@@ -1,0 +1,57 @@
+package "Base-Pair Probability Pipeline"
+
+purpose "A method for finding the average base-pair probability of all kmers in a protein"
+
+usage "bppPipeline [OPTIONS] [<input.fa>] [<bound.fa>]"
+
+version "1.0"
+
+args "--file-name=bppPipeline_cmdl --include-getopt --default-optional --unamed-opts --func-name=bppPipeline_cmdline_parser --arg-struct-name=bppPipeline_args_info"
+
+description "The Base-Pair Probability Pipeline is a C program designed to analyze RNA sequences and identify enriched\
+base-pair interactions in protein-bound RNA. It follows a structured pipeline that includes RNA folding, k-mer\
+counting, and enrichment analysis, producing a CSV file with ranked k-mers based on their likelihood of being\
+bound or unbound."
+
+option "input" i
+"Read the controls sequences file.\n"
+details="The bppPipeline by default reads the positional arguments that follow the bppPipeline command, or reading from\
+ stdin. By using this option, you can specify which file you want to be the control sequences. Note that you can only pass\
+ one control file in the command.\n"
+string
+typestr="filename"
+optional
+
+option "bound" b
+"Read the protein bound RNA sequences file.\n"
+details="The bppPipeline by default reads the positional arguments that follow the bppPipeline command, or reading from\
+ stdin. By using this option, you can specify which file you want to be the bound sequences. The bound sequences are the\
+ RNA sequences in which a protein was experimentally found to bind towards. Note that you can only pass one bound file\
+ in the command.\n"
+string
+typestr="filename"
+optional
+
+option "output" o
+"Set the name of the output files.\n"
+details="Specify the default name for the output file. If this option is not used, the default name is \"rna.avgbpp.csv\".\n"
+string
+typestr="filename"
+optional
+
+option "kmer" k
+"Set the length of k-mers.\n"
+details="Specify the length of the k-mers you want to perform the enrichment analysis on.\n"
+int
+default="3"
+optional
+
+option "noBin" -
+"Do not produce bin files.\n"
+flag
+off
+
+option "frq" -
+"Keep the frequency files.\n"
+flag
+off
