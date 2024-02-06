@@ -28,19 +28,18 @@ bppHashTable init_hash_table(int kmer) {
 
     for (size_t i = 0; i < table_size; i++) {
         hash_table.entries[i].key = NULL;
-        hash_table.entries[i].data.values = malloc(kmer * sizeof(double));
+        hash_table.entries[i].data.values = malloc((kmer+1) * sizeof(double));
 
         if (!hash_table.entries[i].data.values) {
             perror("Failed to allocate memory for values array");
             exit(EXIT_FAILURE);
         }
 
-        for (int j = 0; j < kmer; j++) {
+        for (int j = 0; j < kmer+1; j++) {
             hash_table.entries[i].data.values[j] = 0.0;
         }
     }
 
-    //int key_length = 1 << (2 * kmer);
     for (int i = 0; i < table_size; i++) {
         hash_table.entries[i].key = malloc((kmer + 1) * sizeof(char));
         if (!hash_table.entries[i].key) {
@@ -73,16 +72,28 @@ double *get(bppHashTable *hash_table, const char *key) {
         if (strcmp(hash_table->entries[index].key, key) == 0) {
             return hash_table->entries[index].data.values;
         }
-        index = (index + 1) % hash_table->size; // Linear probing for collisions
+        break;
     }
     return NULL; // Key not found
 }
 
-void printBPPHashTable(bppHashTable hash_table, int kmer) {
-    for(size_t i = 0; i < hash_table.size; i++) {
-        printf("Key: %s, Values: ", hash_table.entries[i].key);
-        for(int j = 0; j < kmer; j++)
-            printf("%f ",hash_table.entries[i].data.values[j]);
+void addValue(bppHashTable *hash_table, const char *key, double value, int value_index) {
+    unsigned int index = hash(key);
+    while (hash_table->entries[index].key != NULL) {
+        if (strcmp(hash_table->entries[index].key, key) == 0) {
+            hash_table->entries[index].data.values[value_index] += value;
+            return;
+        }
+        break;
+    }
+    exit(EXIT_FAILURE);
+}
+
+void printBPPHashTable(bppHashTable *hash_table, int kmer) {
+    for(size_t i = 0; i < hash_table->size; i++) {
+        printf("Key: %s, Values: ", hash_table->entries[i].key);
+        for(int j = 0; j < kmer+1; j++)
+            printf("%f ",hash_table->entries[i].data.values[j]);
         printf("\n");
     }
 }

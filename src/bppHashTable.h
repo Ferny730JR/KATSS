@@ -27,4 +27,8 @@ void free_hash_table(bppHashTable *hash_table);
 
 double *get(bppHashTable *hash_table, const char *key);
 
+void addValue(bppHashTable *hash_table, const char *key, double value, int value_index);
+
+void printBPPHashTable(bppHashTable *hash_table, int kmer);
+
 #endif  // BPP_HASH_TABLE_H
