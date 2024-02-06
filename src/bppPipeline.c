@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bppHashTable.h"
 #include "bppPipeline_cmdl.h"
 
 struct options {
@@ -12,7 +14,8 @@ struct options {
     int     frq;
 };
 
-void init_default_options(struct options *opt) {
+void 
+init_default_options(struct options *opt) {
     opt->input_file = NULL;
     opt->bound_file = NULL;
     opt->out_file   = NULL;
@@ -21,7 +24,8 @@ void init_default_options(struct options *opt) {
     opt->frq        = 0;
 }
 
-void print_options(struct options *opt) {
+void 
+print_options(struct options *opt) {
     printf("Input file: \"%s\"\n",opt->input_file);
     printf("Bound file: \"%s\"\n",opt->bound_file);
     printf("Output file: \"%s\"\n",opt->out_file);
@@ -29,6 +33,8 @@ void print_options(struct options *opt) {
     printf("No Bins: \"%d\"\n",opt->noBin);
     printf("Include frq: \"%d\"\n",opt->frq);
 }
+
+bppHashTable bppCountKmers(char *filename, int kmer);
 
 int main(int argc, char **argv) {
     
@@ -72,5 +78,44 @@ int main(int argc, char **argv) {
     
     print_options(&opt);
 
+
+    bppHashTable my_table = bppCountKmers(opt.input_file, opt.kmer);
+    
+    // do some stuff
+    free_hash_table(&my_table);
+
     return 0;
+}
+
+bppHashTable bppCountKmers(char *filename, int kmer) {
+    bppHashTable    frequency_table;
+    FILE            *read_file;
+    double          bpp;
+
+    frequency_table = init_hash_table(kmer);
+    read_file = fopen(filename, "r");
+
+    char buffer[1000];
+    while (fgets(buffer, sizeof(buffer), read_file)) {
+        printf("==NEW LINE==\n");
+
+        char *data = strtok(buffer, " ");
+        printf("Seq: %s\n",data);
+
+        data = strtok(NULL, " ");
+        while (data !=NULL)
+        {
+            bpp = atof(data);   // base pair probabilities
+            printf("\tFIELD %f\n", atof(data));
+
+            /* todo - Further processing of data */
+
+            data = strtok(NULL, " ");   // process next field
+        }
+        printf("\n");
+    }
+
+    fclose(read_file);
+
+    return frequency_table;
 }
