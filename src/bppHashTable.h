@@ -17,14 +17,14 @@ typedef struct {
 typedef struct {
     size_t size;
     Entry *entries;
-} HashTable;
+} bppHashTable;
 
 unsigned int hash(const char *key);
 
-HashTable init_hash_table(int kmer);
+bppHashTable init_hash_table(int kmer);
 
-void free_hash_table(HashTable *hash_table);
+void free_hash_table(bppHashTable *hash_table);
 
-double *get(HashTable *hash_table, const char *key);
+double *get(bppHashTable *hash_table, const char *key);
 
 #endif  // BPP_HASH_TABLE_H

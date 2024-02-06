@@ -5,20 +5,6 @@
 
 #define BASES "ACGU"
 
-typedef struct {
-    double *values;
-} Data;
-
-typedef struct {
-    char *key;
-    Data data;
-} Entry;
-
-typedef struct {
-    size_t size;
-    Entry *entries;
-} HashTable;
-
 unsigned int hash(const char *key) {
     // Assuming the key is composed of 'A', 'U', 'C', 'G' characters
     unsigned int hash_value = 0;
@@ -29,9 +15,9 @@ unsigned int hash(const char *key) {
     return hash_value;
 }
 
-HashTable init_hash_table(int kmer) {
+bppHashTable init_hash_table(int kmer) {
     size_t table_size = 1 << (2 * kmer); // 4^kmer
-    HashTable hash_table;
+    bppHashTable hash_table;
     hash_table.size = table_size;
     hash_table.entries = malloc(table_size * sizeof(Entry));
 
@@ -73,7 +59,7 @@ HashTable init_hash_table(int kmer) {
     return hash_table;
 }
 
-void free_hash_table(HashTable *hash_table) {
+void free_hash_table(bppHashTable *hash_table) {
     for (size_t i = 0; i < hash_table->size; i++) {
         free(hash_table->entries[i].key);
         free(hash_table->entries[i].data.values);
@@ -81,7 +67,7 @@ void free_hash_table(HashTable *hash_table) {
     free(hash_table->entries);
 }
 
-double *get(HashTable *hash_table, const char *key) {
+double *get(bppHashTable *hash_table, const char *key) {
     unsigned int index = hash(key);
     while (hash_table->entries[index].key != NULL) {
         if (strcmp(hash_table->entries[index].key, key) == 0) {
@@ -92,37 +78,11 @@ double *get(HashTable *hash_table, const char *key) {
     return NULL; // Key not found
 }
 
-int main() {
-    int kmer = 3;
-    HashTable myHashTable = init_hash_table(kmer);
-
-    // Accessing the hash table
-    for (size_t i = 0; i < myHashTable.size; i++) {
-        printf("Key: %s, Hash: %d, Values: ", myHashTable.entries[i].key, hash(myHashTable.entries[i].key));
-        for (int j = 0; j < kmer; j++) {
-            printf("%f ", myHashTable.entries[i].data.values[j]);
-        }
+void printBPPHashTable(bppHashTable hash_table, int kmer) {
+    for(size_t i = 0; i < hash_table.size; i++) {
+        printf("Key: %s, Values: ", hash_table.entries[i].key);
+        for(int j = 0; j < kmer; j++)
+            printf("%f ",hash_table.entries[i].data.values[j]);
         printf("\n");
     }
-
-    // Example of using the get function
-    const char *search_key = "AGC";
-    printf("Hash: %d\n",hash("AGG"));
-    printf("Hash: %d\n",hash(search_key));
-
-    double *values = get(&myHashTable, search_key);
-    if (values) {
-        printf("Values for key '%s': ", search_key);
-        for (size_t j = 0; j < kmer; j++) {
-            printf("%f ", values[j]);
-        }
-        printf("\n");
-    } else {
-        printf("Key '%s' not found.\n", search_key);
-    }
-
-    // Freeing the memory used by the hash table
-    free_hash_table(&myHashTable);
-
-    return 0;
 }
