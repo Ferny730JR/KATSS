@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "bppHashTable.h"
+#include "utils.h"
+
 #include "bppPipeline_cmdl.h"
 
 struct options {
@@ -14,8 +17,12 @@ struct options {
     int     frq;
 };
 
-void 
-init_default_options(struct options *opt) {
+bppHashTable bppCountKmers(char *filename, 
+                           int kmer);
+
+void getFrequencies(bppHashTable counts_table);
+
+void init_default_options(struct options *opt) {
     opt->input_file = NULL;
     opt->bound_file = NULL;
     opt->out_file   = NULL;
@@ -24,8 +31,7 @@ init_default_options(struct options *opt) {
     opt->frq        = 0;
 }
 
-void 
-print_options(struct options *opt) {
+void print_options(struct options *opt) {
     printf("Input file: \"%s\"\n",opt->input_file);
     printf("Bound file: \"%s\"\n",opt->bound_file);
     printf("Output file: \"%s\"\n",opt->out_file);
@@ -34,7 +40,6 @@ print_options(struct options *opt) {
     printf("Include frq: \"%d\"\n",opt->frq);
 }
 
-bppHashTable bppCountKmers(char *filename, int kmer);
 
 int main(int argc, char **argv) {
     
@@ -51,15 +56,24 @@ int main(int argc, char **argv) {
     */
 
     if (bppPipeline_cmdline_parser(argc, argv, &args_info) != 0)
-        exit(1);
+        exit(EXIT_FAILURE);
     
     if(args_info.input_given) {
         opt.input_file = strdup(args_info.input_arg);
+        if(access(opt.input_file, F_OK|R_OK) != 0) {
+            error_warning("Unable to open input file '%s' for reading.",args_info.bound_arg);
+            exit(EXIT_FAILURE);
+        }
     }
 
-    if(args_info.bound_given)
+    if(args_info.bound_given) {
         opt.bound_file = strdup(args_info.bound_arg);
-    
+        if(access(opt.bound_file, F_OK|R_OK) != 0) {
+            error_warning("Unable to open bound file '%s' for reading.",args_info.bound_arg);
+            exit(EXIT_FAILURE);
+        }
+    }
+
     if(args_info.output_given)
         opt.out_file = strdup(args_info.output_arg);
     
@@ -81,41 +95,76 @@ int main(int argc, char **argv) {
 
     bppHashTable my_table = bppCountKmers(opt.input_file, opt.kmer);
     
-    // do some stuff
+    printBPPHashTable(&my_table, opt.kmer);
+
+    // cleanup
     free_hash_table(&my_table);
 
     return 0;
 }
 
 bppHashTable bppCountKmers(char *filename, int kmer) {
-    bppHashTable    frequency_table;
+    bppHashTable    counts_table;
     FILE            *read_file;
+    char            *data;
+    char            *sequence;
+    char            k_substr[kmer+1];
     double          bpp;
+    int             seq_length;
+    int             num_kmers_in_seq;
 
-    frequency_table = init_hash_table(kmer);
+    counts_table = init_hash_table(kmer);
     read_file = fopen(filename, "r");
 
-    char buffer[1000];
+    char buffer[10000];
     while (fgets(buffer, sizeof(buffer), read_file)) {
-        printf("==NEW LINE==\n");
 
         char *data = strtok(buffer, " ");
-        printf("Seq: %s\n",data);
+        seq_length = strlen(data);
+        sequence = strdup(data);
+
+        num_kmers_in_seq = seq_length - kmer + 1;
+        double token_bpp_values[num_kmers_in_seq];
 
         data = strtok(NULL, " ");
-        while (data !=NULL)
-        {
-            bpp = atof(data);   // base pair probabilities
-            printf("\tFIELD %f\n", atof(data));
-
-            /* todo - Further processing of data */
-
-            data = strtok(NULL, " ");   // process next field
+        int token_count = 0;
+        while(data != NULL) {
+            bpp = atof(data);
+            token_bpp_values[token_count++]=bpp;
+            data = strtok(NULL, " ");
         }
-        printf("\n");
+
+        for(int i=0; i<num_kmers_in_seq; i++) {
+            // Get kmer substring
+            memcpy( k_substr, &sequence[i], kmer );
+            k_substr[kmer] = '\0';
+            addValue(&counts_table, k_substr, 1, kmer);
+            
+            // Loop through bpp values in file
+            for(int j=i; j<kmer+i; j++) {
+                addValue(&counts_table, k_substr, token_bpp_values[j], j-i);
+            }
+        }
+        free(sequence);
+        free(data);
     }
 
     fclose(read_file);
+    
+    getFrequencies(counts_table);
 
-    return frequency_table;
+    return counts_table;
+}
+
+void getFrequencies(bppHashTable counts_table) {
+    int num_columns = strlen(counts_table.entries[0].key);
+    int total_count;
+    for(int i=0; i<counts_table.size; i++) {
+        if(counts_table.entries[i].data.values[num_columns]<1)
+            continue;
+        for(int j=0; j<num_columns; j++) {
+            total_count=counts_table.entries[i].data.values[num_columns];
+            counts_table.entries[i].data.values[j]/=counts_table.entries[i].data.values[num_columns];
+        }
+    }
 }
