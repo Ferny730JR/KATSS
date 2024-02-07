@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <unistd.h>
 
 #include "bppHashTable.h"
@@ -17,10 +18,16 @@ struct options {
     int     frq;
 };
 
+void print_options(struct options *opt);
+
 bppHashTable bppCountKmers(char *filename, 
                            int kmer);
 
 void getFrequencies(bppHashTable counts_table);
+
+bppHashTable getBPPEnrichment(bppHashTable *control_frq, 
+                              bppHashTable *bound_frq, 
+                              int kmer);
 
 void init_default_options(struct options *opt) {
     opt->input_file = NULL;
@@ -31,21 +38,14 @@ void init_default_options(struct options *opt) {
     opt->frq        = 0;
 }
 
-void print_options(struct options *opt) {
-    printf("Input file: \"%s\"\n",opt->input_file);
-    printf("Bound file: \"%s\"\n",opt->bound_file);
-    printf("Output file: \"%s\"\n",opt->out_file);
-    printf("Kmer: \"%d\"\n",opt->kmer);
-    printf("No Bins: \"%d\"\n",opt->noBin);
-    printf("Include frq: \"%d\"\n",opt->frq);
-}
-
-
 int main(int argc, char **argv) {
     
-
+    // Declare variables
     struct bppPipeline_args_info    args_info;
     struct options                  opt;
+    bppHashTable                    bounds_table;
+    bppHashTable                    control_table;
+    bppHashTable                    enrichments_table;
 
     init_default_options(&opt);
 
@@ -90,15 +90,28 @@ int main(int argc, char **argv) {
     if(args_info.noBin_given)
         opt.noBin = 1;
     
+    bppPipeline_cmdline_parser_free(&args_info);
+    
     print_options(&opt);
 
+    /*
+    ############################################################
+    # Script                                                   #
+    ############################################################
+    */
 
-    bppHashTable my_table = bppCountKmers(opt.input_file, opt.kmer);
+    control_table = bppCountKmers(opt.input_file, opt.kmer);
+    bounds_table  = bppCountKmers(opt.bound_file, opt.kmer);
+
+    enrichments_table = getBPPEnrichment(&control_table, &bounds_table, opt.kmer);
+
     
-    printBPPHashTable(&my_table, opt.kmer);
+    printBPPHashTable(&enrichments_table, opt.kmer);
 
     // cleanup
-    free_hash_table(&my_table);
+    free_hash_table(&control_table);
+    free_hash_table(&bounds_table);
+    free_hash_table(&enrichments_table);
 
     return 0;
 }
@@ -164,7 +177,68 @@ void getFrequencies(bppHashTable counts_table) {
             continue;
         for(int j=0; j<num_columns; j++) {
             total_count=counts_table.entries[i].data.values[num_columns];
-            counts_table.entries[i].data.values[j]/=counts_table.entries[i].data.values[num_columns];
+            counts_table.entries[i].data.values[j]/=total_count;
         }
     }
+}
+
+bppHashTable getBPPEnrichment(bppHashTable *control_frq, 
+                              bppHashTable *bound_frq, 
+                              int kmer) {
+
+    bppHashTable    enrichments_table;
+    char            *key; 
+    double          enrichment;
+    double          *bound_values;
+    double          *control_values;
+    double          *enrichment_values;
+    double          mean_enrichment;
+
+    enrichments_table = init_hash_table(kmer);
+
+    // Get the log2 fold change for each kmer
+    for(size_t i = 0; i < bound_frq->size; i++) {
+        key = bound_frq->keys[i];
+
+        bound_values   =    get(bound_frq, key);
+        control_values =    get(control_frq, key);
+
+        for(int j = 0; j < kmer; j++) {
+            if(bound_values[j] == 0 || control_values[j] == 0) {
+                enrichment = 0;
+            } else {
+                enrichment = log(bound_values[j]/control_values[j])/log(2);
+            }
+            addValue(&enrichments_table, key, enrichment, j);
+        }
+    }
+
+    for(size_t i = 0; i < enrichments_table.size; i++) {
+        key = enrichments_table.keys[i];
+        enrichment_values = get(&enrichments_table, key);
+
+        mean_enrichment = 0;
+        for(int j = 0; j < kmer; j++) {
+            mean_enrichment += enrichment_values[j];
+        }
+
+        mean_enrichment/=kmer;
+        addValue(&enrichments_table, key, mean_enrichment, kmer);
+    }
+    return enrichments_table;
+}
+
+/*
+    ############################################################
+    #  Helper Functions                                        #
+    ############################################################
+*/
+
+void print_options(struct options *opt) {
+    printf("Input file: \"%s\"\n",opt->input_file);
+    printf("Bound file: \"%s\"\n",opt->bound_file);
+    printf("Output file: \"%s\"\n",opt->out_file);
+    printf("Kmer: \"%d\"\n",opt->kmer);
+    printf("No Bins: \"%d\"\n",opt->noBin);
+    printf("Include frq: \"%d\"\n",opt->frq);
 }
