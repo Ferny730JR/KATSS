@@ -17,6 +17,7 @@ typedef struct {
 typedef struct {
     size_t size;
     Entry *entries;
+    char **keys;
 } bppHashTable;
 
 unsigned int hash(const char *key);

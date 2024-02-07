@@ -20,6 +20,7 @@ bppHashTable init_hash_table(int kmer) {
     bppHashTable hash_table;
     hash_table.size = table_size;
     hash_table.entries = malloc(table_size * sizeof(Entry));
+    hash_table.keys = (char**)malloc(table_size * sizeof(char*));
 
     if (!hash_table.entries) {
         perror("Failed to allocate memory for hash table");
@@ -27,6 +28,7 @@ bppHashTable init_hash_table(int kmer) {
     }
 
     for (size_t i = 0; i < table_size; i++) {
+        hash_table.keys[i] = NULL;
         hash_table.entries[i].key = NULL;
         hash_table.entries[i].data.values = malloc((kmer+1) * sizeof(double));
 
@@ -41,15 +43,17 @@ bppHashTable init_hash_table(int kmer) {
     }
 
     for (int i = 0; i < table_size; i++) {
+        hash_table.keys[i] = (char*)malloc((kmer + 1) * sizeof(char));
         hash_table.entries[i].key = malloc((kmer + 1) * sizeof(char));
-        if (!hash_table.entries[i].key) {
-            perror("Failed to allocate memory for key");
+        if (!hash_table.entries[i].key || !hash_table.keys[i]) {
+            perror("Failed to allocate memory for key(s)");
             exit(EXIT_FAILURE);
         }
 
         int index = i;
         for (int j = kmer - 1; j >= 0; j--) {
             hash_table.entries[i].key[j] = BASES[index % 4];
+            hash_table.keys[i][j] = BASES[index % 4];
             index /= 4;
         }
         hash_table.entries[i].key[kmer] = '\0';
