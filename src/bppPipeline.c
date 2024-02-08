@@ -28,6 +28,19 @@ void print_options(struct options *opt);
 void free_options(struct options *opt);
 
 
+int compare(const void  *a, 
+            const void  *b);
+
+
+void bppHashTable_to_file(bppHashTable *table, 
+                           char         *name, 
+                           char         *file_extension);
+
+
+void print_table_to_file(bppHashTable   *table, 
+                         FILE           *table_file);
+
+
 bppHashTable bppCountKmers(char *filename, 
                            int kmer);
 
@@ -48,7 +61,7 @@ bppHashTable getBPPEnrichment(bppHashTable  *control_frq,
 void init_default_options(struct options *opt) {
     opt->input_file = NULL;
     opt->bound_file = NULL;
-    opt->out_file   = NULL;
+    opt->out_file   = "rna";
     opt->kmer       = 3;
     opt->noBin      = 0;
     opt->frq        = 0;
@@ -118,8 +131,9 @@ int main(int argc, char **argv) {
 
     enrichments_table = getBPPEnrichment(&control_table, &bounds_table, opt.kmer);
 
-    
     printBPPHashTable(&enrichments_table, opt.kmer);
+
+    bppHashTable_to_file(&enrichments_table, opt.out_file, ".csv");
 
     /* Clean up */
     free_hash_table(&control_table);
@@ -140,7 +154,6 @@ bppHashTable bppCountKmers(char *filename, int kmer) {
 
     char buffer[10000];
     while (fgets(buffer, sizeof(buffer), read_file)) {
-
         process_line(buffer, counts_table, kmer);
     }
     fclose(read_file);
@@ -249,6 +262,7 @@ bppHashTable getBPPEnrichment(bppHashTable *control_frq,
         mean_enrichment/=kmer;
         addValue(&enrichments_table, key, mean_enrichment, kmer);
     }
+    qsort(enrichments_table.entries, enrichments_table.size, sizeof(Entry), compare);
     return enrichments_table;
 }
 
@@ -257,6 +271,61 @@ bppHashTable getBPPEnrichment(bppHashTable *control_frq,
 #  Helper Functions                                        #
 ##########################################################*/
 
+int compare(const void *a, const void *b) {
+
+    Entry *entryA = (Entry *)a;
+    Entry *entryB = (Entry *)b;
+
+    int mean_index = strlen(entryA->key);
+    if(entryA->data.values[mean_index] > entryB->data.values[mean_index])
+        return -1;
+    if(entryA->data.values[mean_index] < entryB->data.values[mean_index])
+        return 1;
+    return 0;
+}
+
+
+void bppHashTable_to_file(bppHashTable *table, char *name, char *file_extension) {
+    size_t name_len = strlen(name);
+    size_t extension_len = strlen(file_extension);
+    char *filename = malloc(name_len + extension_len + 1);
+
+    memcpy(filename, name, name_len);
+    memcpy(filename + name_len, file_extension, extension_len + 1);
+    
+    FILE *table_file = fopen(filename, "w");
+    if (table_file == NULL) {
+        error_message("Could not write to file '%s'\n",filename);
+    }
+    
+    if(strcmp(file_extension, ".csv") == 0) {
+        print_table_to_file(table, table_file);
+    }
+
+    free(filename);
+    fclose(table_file);
+}
+
+void print_table_to_file(bppHashTable *table, FILE *table_file) {
+
+    int num_columns = strlen(table->keys[0]) + 1;
+    for(size_t i = 0; i < table->size; i++) {
+
+        fprintf(table_file, "%s", table->entries[i].key);
+        for(size_t j = 0; j < num_columns; j++) {
+            fprintf(table_file, ",%9.6f", table->entries[i].data.values[j]);
+        }
+        fprintf(table_file,"\n");
+    }
+}
+
+
+void free_options(struct options *opt) {
+    free(opt->input_file);
+    free(opt->bound_file);
+}
+
+
 void print_options(struct options *opt) {
     printf("Input file: \"%s\"\n",opt->input_file);
     printf("Bound file: \"%s\"\n",opt->bound_file);
@@ -264,10 +333,4 @@ void print_options(struct options *opt) {
     printf("Kmer: \"%d\"\n",opt->kmer);
     printf("No Bins: \"%d\"\n",opt->noBin);
     printf("Include frq: \"%d\"\n",opt->frq);
-}
-
-void free_options(struct options *opt) {
-    free(opt->input_file);
-    free(opt->bound_file);
-    free(opt->out_file);
 }
