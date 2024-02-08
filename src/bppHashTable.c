@@ -64,31 +64,27 @@ bppHashTable init_hash_table(int kmer) {
 
 void free_hash_table(bppHashTable *hash_table) {
     for (size_t i = 0; i < hash_table->size; i++) {
+        free(hash_table->keys[i]);
         free(hash_table->entries[i].key);
         free(hash_table->entries[i].data.values);
     }
+    free(hash_table->keys);
     free(hash_table->entries);
 }
 
 double *get(bppHashTable *hash_table, const char *key) {
     unsigned int index = hash(key);
-    while (hash_table->entries[index].key != NULL) {
-        if (strcmp(hash_table->entries[index].key, key) == 0) {
-            return hash_table->entries[index].data.values;
-        }
-        break;
+    if (strcmp(hash_table->entries[index].key, key) == 0) {
+        return hash_table->entries[index].data.values;
     }
-    return NULL; // Key not found
+    exit(EXIT_FAILURE);
 }
 
 void addValue(bppHashTable *hash_table, const char *key, double value, int value_index) {
     unsigned int index = hash(key);
-    while (hash_table->entries[index].key != NULL) {
-        if (strcmp(hash_table->entries[index].key, key) == 0) {
-            hash_table->entries[index].data.values[value_index] += value;
-            return;
-        }
-        break;
+    if (strcmp(hash_table->entries[index].key, key) == 0) {
+        hash_table->entries[index].data.values[value_index] += value;
+        return;
     }
     exit(EXIT_FAILURE);
 }
