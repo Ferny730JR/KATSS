@@ -2,3 +2,4 @@
 src/bppPipeline
 src/input.test.reads
 src/bound.test.reads
+src/out
