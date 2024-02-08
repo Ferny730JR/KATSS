@@ -10,6 +10,6 @@
 #define ANSI_COLOR_BRIGHT   "\x1b[1m"
 #define ANSI_COLOR_RESET    "\x1b[0m"
 
-void error_warning(const char *format, ...);
+void error_message(const char *format, ...);
 
 #endif
