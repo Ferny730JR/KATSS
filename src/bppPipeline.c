@@ -5,7 +5,12 @@
 #include <unistd.h>
 
 #include "bppHashTable.h"
+#include "string_utils.h"
 #include "utils.h"
+
+#include "ViennaRNA/fold.h"
+#include "ViennaRNA/part_func.h"
+#include "ViennaRNA/utils/basic.h"
 
 #include "bppPipeline_cmdl.h"
 
@@ -21,6 +26,9 @@ struct options {
 /*##########################################################
 #  Function Declarations                                   #
 ##########################################################*/
+
+float* getPositionalProbabilities(char *sequence);
+
 
 void print_options(struct options *opt);
 
@@ -38,16 +46,22 @@ void bppHashTable_to_file(bppHashTable *table,
 
 
 void print_table_to_file(bppHashTable   *table, 
-                         FILE           *table_file);
+                         FILE           *table_file,
+                         char           sep);
 
 
 bppHashTable bppCountKmers(char *filename, 
                            int kmer);
 
 
-void process_line(char          *line, 
-                  bppHashTable  counts_table, 
-                  int           kmer);
+void process_line(char *sequence, 
+                  bppHashTable counts_table, 
+                  int kmer);
+
+
+void process_line_with_bpp(char          *line, 
+                           bppHashTable  counts_table, 
+                           int           kmer);
 
 
 void getFrequencies(bppHashTable counts_table);
@@ -67,7 +81,9 @@ void init_default_options(struct options *opt) {
     opt->frq        = 0;
 }
 
-
+/*##########################################################
+#  Main                                                    #
+##########################################################*/
 int main(int argc, char **argv) {
     
     // Declare variables
@@ -119,8 +135,6 @@ int main(int argc, char **argv) {
         opt.noBin = 1;
     
     bppPipeline_cmdline_parser_free(&args_info);
-    
-    print_options(&opt);
 
     /*##########################################################
     #  Computations                                            #
@@ -131,9 +145,7 @@ int main(int argc, char **argv) {
 
     enrichments_table = getBPPEnrichment(&control_table, &bounds_table, opt.kmer);
 
-    printBPPHashTable(&enrichments_table, opt.kmer);
-
-    bppHashTable_to_file(&enrichments_table, opt.out_file, ".csv");
+    bppHashTable_to_file(&enrichments_table, opt.out_file, ".csv"); // TODO: implement proper method for changing file extension
 
     /* Clean up */
     free_hash_table(&control_table);
@@ -142,6 +154,34 @@ int main(int argc, char **argv) {
     free_options(&opt);
 
     return 0;
+}
+
+
+float* getPositionalProbabilities(char *sequence) {
+    vrna_ep_t   *ptr, *pair_probabilities = NULL;
+    int         seq_length  = strlen(sequence);
+    char        *propensity = (char *)vrna_alloc(sizeof(char) * (seq_length + 1));
+    float       *positional_probabilities = malloc((seq_length + 1) * sizeof(float));
+    float       probability;
+
+    /* Initialize positional_probabilities array to 0's */
+    memset(positional_probabilities, 0, (seq_length+1) * sizeof(float));
+
+    /* Get the pair probabilities */
+    vrna_pf_fold(sequence, propensity, &pair_probabilities);
+
+    /* Move pair probabilities into array */
+    for(ptr = pair_probabilities; ptr->i != 0; ptr++) {
+        probability = ptr->p;
+        positional_probabilities[ptr->i]+=probability;
+        positional_probabilities[ptr->j]+=probability;
+    }
+
+    /* Clean up memory */
+    free(propensity);
+    free(pair_probabilities);
+
+    return positional_probabilities;
 }
 
 
@@ -154,6 +194,12 @@ bppHashTable bppCountKmers(char *filename, int kmer) {
 
     char buffer[10000];
     while (fgets(buffer, sizeof(buffer), read_file)) {
+
+        // Pre processing in the line
+        seq_to_RNA(buffer);
+        seq_to_upper(buffer);
+        remove_escapes(buffer);
+
         process_line(buffer, counts_table, kmer);
     }
     fclose(read_file);
@@ -164,7 +210,33 @@ bppHashTable bppCountKmers(char *filename, int kmer) {
 }
 
 
-void process_line(char *line, bppHashTable counts_table, int kmer) {
+void process_line(char *sequence, bppHashTable counts_table, int kmer) {
+    float  *positional_probabilities;
+    //char    k_substr[kmer+1];
+    char    *k_substr;
+    int     seq_length = strlen(sequence);
+    int     num_kmers_in_seq = seq_length - kmer + 1;
+
+    positional_probabilities = getPositionalProbabilities(sequence);
+
+    for(int i=0; i<num_kmers_in_seq; i++) {
+        // Get kmer substring
+        k_substr = substr(sequence, i, kmer);
+  
+        addValue(&counts_table, k_substr, 1, kmer);
+        
+        // Loop through bpp values in file
+        for(int j=i+1; j<kmer+i+1; j++) {
+            addValue(&counts_table, k_substr, positional_probabilities[j], j-i-1);
+        }
+
+        free(k_substr);
+    }
+    free(positional_probabilities);
+}
+
+
+void process_line_with_bpp(char *line, bppHashTable counts_table, int kmer) {
     char    *data;
     char    *sequence;
     char    k_substr[kmer+1];
@@ -299,21 +371,23 @@ void bppHashTable_to_file(bppHashTable *table, char *name, char *file_extension)
     }
     
     if(strcmp(file_extension, ".csv") == 0) {
-        print_table_to_file(table, table_file);
+        print_table_to_file(table, table_file, ',');
+    } else if(strcmp(file_extension, ".tsv") == 0) {
+        print_table_to_file(table, table_file, '\t');
     }
 
     free(filename);
     fclose(table_file);
 }
 
-void print_table_to_file(bppHashTable *table, FILE *table_file) {
+void print_table_to_file(bppHashTable *table, FILE *table_file, char sep) {
 
     int num_columns = strlen(table->keys[0]) + 1;
     for(size_t i = 0; i < table->size; i++) {
 
         fprintf(table_file, "%s", table->entries[i].key);
         for(size_t j = 0; j < num_columns; j++) {
-            fprintf(table_file, ",%9.6f", table->entries[i].data.values[j]);
+            fprintf(table_file, "%c%9.6f", sep, table->entries[i].data.values[j]);
         }
         fprintf(table_file,"\n");
     }
