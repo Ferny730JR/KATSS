@@ -1,7 +1,10 @@
 {
     "C_Cpp.default.compilerPath": "/usr/bin/gcc",
     "files.associations": {
-        "bpphashtable.h": "c"
+        "bpphashtable.h": "c",
+        "__locale": "c",
+        "cctype": "c",
+        "locale": "c"
     },
     "editor.wordWrap": "wordWrapColumn",
     "editor.wordWrapColumn": 99

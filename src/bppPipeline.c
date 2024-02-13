@@ -19,7 +19,9 @@ struct options {
     char    *bound_file;
     char    *out_file;
     int     kmer;
-    int     noBin;
+    int     seq_windows;
+    int     window_size;
+    int     bin;
     int     frq;
 };
 
@@ -51,7 +53,7 @@ void print_table_to_file(bppHashTable   *table,
 
 
 bppHashTable bppCountKmers(char *filename, 
-                           int kmer);
+                           struct options *opt);
 
 
 void process_line(char *sequence, 
@@ -64,6 +66,11 @@ void process_line_with_bpp(char          *line,
                            int           kmer);
 
 
+void process_windows(char *sequence,
+                     bppHashTable counts_table,
+                     struct options *opt);
+
+
 void getFrequencies(bppHashTable counts_table);
 
 
@@ -73,12 +80,14 @@ bppHashTable getBPPEnrichment(bppHashTable  *control_frq,
 
 
 void init_default_options(struct options *opt) {
-    opt->input_file = NULL;
-    opt->bound_file = NULL;
-    opt->out_file   = "rna";
-    opt->kmer       = 3;
-    opt->noBin      = 0;
-    opt->frq        = 0;
+    opt->input_file     = NULL;
+    opt->bound_file     = NULL;
+    opt->out_file       = "rna";
+    opt->kmer           = 3;
+    opt->seq_windows    = 0;
+    opt->window_size    = 20;
+    opt->bin            = 0;
+    opt->frq            = 0;
 }
 
 /*##########################################################
@@ -128,11 +137,19 @@ int main(int argc, char **argv) {
         opt.kmer = args_info.kmer_arg;
     }
 
+    if(args_info.seq_windows_given) {
+        if(args_info.seq_windows_arg <= 0) {
+            error_message("option 'seq-windows' must be greater than 0");
+        }
+        opt.seq_windows = 1;
+        opt.window_size = args_info.seq_windows_arg;
+    }
+
     if(args_info.frq_given)
         opt.frq = 1;
     
-    if(args_info.noBin_given)
-        opt.noBin = 1;
+    if(args_info.bin_given)
+        opt.bin = 1;
     
     bppPipeline_cmdline_parser_free(&args_info);
 
@@ -140,8 +157,8 @@ int main(int argc, char **argv) {
     #  Computations                                            #
     ##########################################################*/
 
-    control_table = bppCountKmers(opt.input_file, opt.kmer);
-    bounds_table  = bppCountKmers(opt.bound_file, opt.kmer);
+    control_table = bppCountKmers(opt.input_file, &opt);
+    bounds_table  = bppCountKmers(opt.bound_file, &opt);
 
     enrichments_table = getBPPEnrichment(&control_table, &bounds_table, opt.kmer);
 
@@ -173,8 +190,8 @@ float* getPositionalProbabilities(char *sequence) {
     /* Move pair probabilities into array */
     for(ptr = pair_probabilities; ptr->i != 0; ptr++) {
         probability = ptr->p;
-        positional_probabilities[ptr->i]+=probability;
-        positional_probabilities[ptr->j]+=probability;
+        positional_probabilities[ptr->i-1]+=probability;
+        positional_probabilities[ptr->j-1]+=probability;
     }
 
     /* Clean up memory */
@@ -185,11 +202,11 @@ float* getPositionalProbabilities(char *sequence) {
 }
 
 
-bppHashTable bppCountKmers(char *filename, int kmer) {
+bppHashTable bppCountKmers(char *filename, struct options *opt) {
     bppHashTable    counts_table;
     FILE            *read_file;
 
-    counts_table = init_hash_table(kmer);
+    counts_table = init_hash_table(opt->kmer);
     read_file = fopen(filename, "r");
 
     char buffer[10000];
@@ -199,8 +216,12 @@ bppHashTable bppCountKmers(char *filename, int kmer) {
         seq_to_RNA(buffer);
         seq_to_upper(buffer);
         remove_escapes(buffer);
-
-        process_line(buffer, counts_table, kmer);
+        
+        if(opt->seq_windows) {
+            process_windows(buffer, counts_table, opt);
+        } else {
+            process_line(buffer, counts_table, opt->kmer);
+        }
     }
     fclose(read_file);
     
@@ -211,8 +232,7 @@ bppHashTable bppCountKmers(char *filename, int kmer) {
 
 
 void process_line(char *sequence, bppHashTable counts_table, int kmer) {
-    float  *positional_probabilities;
-    //char    k_substr[kmer+1];
+    float   *positional_probabilities;
     char    *k_substr;
     int     seq_length = strlen(sequence);
     int     num_kmers_in_seq = seq_length - kmer + 1;
@@ -226,8 +246,8 @@ void process_line(char *sequence, bppHashTable counts_table, int kmer) {
         addValue(&counts_table, k_substr, 1, kmer);
         
         // Loop through bpp values in file
-        for(int j=i+1; j<kmer+i+1; j++) {
-            addValue(&counts_table, k_substr, positional_probabilities[j], j-i-1);
+        for(int j=i; j<kmer+i; j++) {
+            addValue(&counts_table, k_substr, positional_probabilities[j], j-i);
         }
 
         free(k_substr);
@@ -272,6 +292,74 @@ void process_line_with_bpp(char *line, bppHashTable counts_table, int kmer) {
         }
     }
     free(sequence);
+}
+
+
+void process_windows(char *sequence, bppHashTable counts_table, struct options *opt) {
+    char    *k_substr;
+    char    *window_seq;
+    float   *window_probabilities;
+    float   mean_probability;
+    float   sum_probability;
+    int     num_windows;
+    int     seq_length;
+    int     count_probs;
+
+    // Initialize probability matrix with -1
+    seq_length = strlen(sequence);
+    num_windows = seq_length - opt->window_size + 1;
+    float probability_matrix[num_windows][seq_length];
+    for(int row=0; row<num_windows; row++){
+        for(int col=0; col<seq_length; col++) {
+            probability_matrix[row][col]=-1;
+        }
+    }
+
+    // Fill the probability matrix with probabilities
+    for(int i = 0; i<num_windows; i++) {
+        window_seq = substr(sequence, i, opt->window_size);
+        window_probabilities = getPositionalProbabilities(window_seq);
+
+        for(int j = 0; j < opt->window_size; j++) {
+            probability_matrix[i][j+i] = window_probabilities[j];
+        }
+
+        free(window_probabilities);
+    }
+
+    // Get the average of each column in matrix
+    float positional_probabilities[seq_length];
+    for(int col=0; col<seq_length; col++) {
+        sum_probability = 0;
+        count_probs     = 0;
+
+        for(int row=0; row<num_windows; row++) {
+            if(probability_matrix[row][col] == -1) {
+                continue;
+            }
+            sum_probability+=probability_matrix[row][col];
+            count_probs++;
+        }
+
+        mean_probability = sum_probability/count_probs;
+        positional_probabilities[col] = mean_probability;
+    }
+
+    // Fill counts_table with positional probabilities
+    int num_kmers_in_seq = seq_length - opt->kmer + 1;
+    for(int i=0; i<num_kmers_in_seq; i++) {
+        // Get kmer substring
+        k_substr = substr(sequence, i, opt->kmer);
+  
+        addValue(&counts_table, k_substr, 1, opt->kmer);
+        
+        // Loop through bpp values in file
+        for(int j=i; j<opt->kmer+i; j++) {
+            addValue(&counts_table, k_substr, positional_probabilities[j], j-i);
+        }
+
+        free(k_substr);
+    }
 }
 
 
@@ -405,6 +493,7 @@ void print_options(struct options *opt) {
     printf("Bound file: \"%s\"\n",opt->bound_file);
     printf("Output file: \"%s\"\n",opt->out_file);
     printf("Kmer: \"%d\"\n",opt->kmer);
-    printf("No Bins: \"%d\"\n",opt->noBin);
+    printf("Seq Windows: \"%d\"\n",opt->seq_windows);
+    printf("Bins: \"%d\"\n",opt->bin);
     printf("Include frq: \"%d\"\n",opt->frq);
 }
