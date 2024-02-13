@@ -21,12 +21,12 @@ extern "C" {
 
 #ifndef BPPPIPELINE_CMDLINE_PARSER_PACKAGE
 /** @brief the program name (used for printing errors) */
-#define BPPPIPELINE_CMDLINE_PARSER_PACKAGE "BPP Pipeline"
+#define BPPPIPELINE_CMDLINE_PARSER_PACKAGE "Base-Pair Probability Pipeline"
 #endif
 
 #ifndef BPPPIPELINE_CMDLINE_PARSER_PACKAGE_NAME
 /** @brief the complete program name (used for help and version) */
-#define BPPPIPELINE_CMDLINE_PARSER_PACKAGE_NAME "BPP Pipeline"
+#define BPPPIPELINE_CMDLINE_PARSER_PACKAGE_NAME "Base-Pair Probability Pipeline"
 #endif
 
 #ifndef BPPPIPELINE_CMDLINE_PARSER_VERSION
@@ -64,9 +64,15 @@ struct bppPipeline_args_info
  original value given at command line.  */
   const char *kmer_help; /**< @brief Set the length of k-mers.
  help description.  */
-  int noBin_flag;	/**< @brief Do not produce bin files.
+  int seq_windows_arg;	/**< @brief Split the sequence into sliding windows of the specified size and find the mean probability per position in the window.
+ (default='20').  */
+  char * seq_windows_orig;	/**< @brief Split the sequence into sliding windows of the specified size and find the mean probability per position in the window.
+ original value given at command line.  */
+  const char *seq_windows_help; /**< @brief Split the sequence into sliding windows of the specified size and find the mean probability per position in the window.
+ help description.  */
+  int bin_flag;	/**< @brief Produce bin file.
  (default=off).  */
-  const char *noBin_help; /**< @brief Do not produce bin files.
+  const char *bin_help; /**< @brief Produce bin file.
  help description.  */
   int frq_flag;	/**< @brief Keep the frequency files.
  (default=off).  */
@@ -80,7 +86,8 @@ struct bppPipeline_args_info
   unsigned int bound_given ;	/**< @brief Whether bound was given.  */
   unsigned int output_given ;	/**< @brief Whether output was given.  */
   unsigned int kmer_given ;	/**< @brief Whether kmer was given.  */
-  unsigned int noBin_given ;	/**< @brief Whether noBin was given.  */
+  unsigned int seq_windows_given ;	/**< @brief Whether seq-windows was given.  */
+  unsigned int bin_given ;	/**< @brief Whether bin was given.  */
   unsigned int frq_given ;	/**< @brief Whether frq was given.  */
 
   char **inputs ; /**< @brief unnamed options (options without names) */
