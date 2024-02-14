@@ -64,6 +64,22 @@ struct bppPipeline_args_info
  original value given at command line.  */
   const char *kmer_help; /**< @brief Set the length of k-mers.
  help description.  */
+  int keepFolds_flag;	/**< @brief Keep the base-pair probability of the folded sequences in a file.
+ (default=off).  */
+  const char *keepFolds_help; /**< @brief Keep the base-pair probability of the folded sequences in a file.
+ help description.  */
+  char * input_fold_arg;	/**< @brief Set the file for the control sequences with the base-pair probabilities pre-calculated.
+.  */
+  char * input_fold_orig;	/**< @brief Set the file for the control sequences with the base-pair probabilities pre-calculated.
+ original value given at command line.  */
+  const char *input_fold_help; /**< @brief Set the file for the control sequences with the base-pair probabilities pre-calculated.
+ help description.  */
+  char * bound_fold_arg;	/**< @brief Set the file for the protein bound sequences with the base-pair probabilities pre-calculated.
+.  */
+  char * bound_fold_orig;	/**< @brief Set the file for the protein bound sequences with the base-pair probabilities pre-calculated.
+ original value given at command line.  */
+  const char *bound_fold_help; /**< @brief Set the file for the protein bound sequences with the base-pair probabilities pre-calculated.
+ help description.  */
   int seq_windows_arg;	/**< @brief Split the sequence into sliding windows of the specified size and find the mean probability per position in the window.
  (default='20').  */
   char * seq_windows_orig;	/**< @brief Split the sequence into sliding windows of the specified size and find the mean probability per position in the window.
@@ -86,6 +102,9 @@ struct bppPipeline_args_info
   unsigned int bound_given ;	/**< @brief Whether bound was given.  */
   unsigned int output_given ;	/**< @brief Whether output was given.  */
   unsigned int kmer_given ;	/**< @brief Whether kmer was given.  */
+  unsigned int keepFolds_given ;	/**< @brief Whether keepFolds was given.  */
+  unsigned int input_fold_given ;	/**< @brief Whether input-fold was given.  */
+  unsigned int bound_fold_given ;	/**< @brief Whether bound-fold was given.  */
   unsigned int seq_windows_given ;	/**< @brief Whether seq-windows was given.  */
   unsigned int bin_given ;	/**< @brief Whether bin was given.  */
   unsigned int frq_given ;	/**< @brief Whether frq was given.  */

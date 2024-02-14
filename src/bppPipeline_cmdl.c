@@ -33,21 +33,30 @@ const char *bppPipeline_args_info_versiontext = "";
 const char *bppPipeline_args_info_description = "The Base-Pair Probability Pipeline is a C program designed to analyze RNA\nsequences and identify enriched base-pair interactions in protein-bound RNA. It\nfollows a structured pipeline that includes RNA folding, k-mer counting, and\nenrichment analysis, producing a CSV file with ranked k-mers based on their\nlikelihood of being bound or unbound.";
 
 const char *bppPipeline_args_info_detailed_help[] = {
-  "  -h, --help               Print help and exit",
-  "      --detailed-help      Print help, including all details and hidden\n                             options, and exit",
-  "  -V, --version            Print version and exit",
-  "  -i, --input=filename     Read the controls sequences file.\n",
+  "  -h, --help                 Print help and exit",
+  "      --detailed-help        Print help, including all details and hidden\n                               options, and exit",
+  "  -V, --version              Print version and exit",
+  "\nI/O Options:",
+  "  Command line options for input and output processing.\n\n",
+  "  -i, --input=filename       Read the controls sequences file.\n",
   "  The bppPipeline by default reads the positional arguments that follow the\n  bppPipeline command, or reading from stdin. By using this option, you can\n  specify which file you want to be the control sequences. Note that you can\n  only pass one control file in the command.\n",
-  "  -b, --bound=filename     Read the protein bound RNA sequences file.\n",
+  "  -b, --bound=filename       Read the protein bound RNA sequences file.\n",
   "  The bppPipeline by default reads the positional arguments that follow the\n  bppPipeline command, or reading from stdin. By using this option, you can\n  specify which file you want to be the bound sequences. The bound sequences\n  are the RNA sequences in which a protein was experimentally found to bind\n  towards. Note that you can only pass one bound file in the command.\n",
-  "  -o, --output=filename    Set the name of the output files.\n",
+  "  -o, --output=filename      Set the name of the output files.\n",
   "  Specify the default name for the output file. If this option is not used, the\n  default name is \"rna.csv\".\n",
-  "  -k, --kmer=INT           Set the length of k-mers.\n                               (default=`3')",
+  "  -k, --kmer=INT             Set the length of k-mers.\n                                 (default=`3')",
   "  Specify the length of the k-mers you want to perform the enrichment analysis\n  on.\n",
-  "  -w, --seq-windows[=INT]  Split the sequence into sliding windows of the\n                             specified size and find the mean probability per\n                             position in the window.\n                               (default=`20')",
+  "      --keepFolds            Keep the base-pair probability of the folded\n                               sequences in a file.\n                                 (default=off)",
+  "      --input-fold=filename  Set the file for the control sequences with the\n                               base-pair probabilities pre-calculated.\n",
+  "  ",
+  "      --bound-fold=filename  Set the file for the protein bound sequences with\n                               the base-pair probabilities pre-calculated.\n",
+  "  ",
+  "\nAlgorithms:",
+  "  Select additional algorithms to determine the calculations.\n\n",
+  "  -w, --seq-windows[=INT]    Split the sequence into sliding windows of the\n                               specified size and find the mean probability per\n                               position in the window.\n                                 (default=`20')",
   "  If this option is provided, each sequence will be iterated by creating\n  sliding windows of the provided size. For example, if the sequence is:\n  \tAGCUUCGA\n  Then, the sliding windows of size 5 would be:\n  \tAGCUU\n  \t GCUUC\n  \t  CUUCG\n  \t   UUCGA\n  The pipeline will then find the base pair probability of each window. After\n  which, the mean probability of each aligned nucleotide across the windows\n  will be used as the base pair probability for each nucleotide in the\n  sequence.\n",
-  "      --bin                Produce bin file.\n                               (default=off)",
-  "      --frq                Keep the frequency files.\n                               (default=off)",
+  "      --bin                  Produce bin file.\n                                 (default=off)",
+  "      --frq                  Keep the frequency files.\n                                 (default=off)",
     0
 };
 
@@ -58,17 +67,24 @@ init_help_array(void)
   bppPipeline_args_info_help[1] = bppPipeline_args_info_detailed_help[1];
   bppPipeline_args_info_help[2] = bppPipeline_args_info_detailed_help[2];
   bppPipeline_args_info_help[3] = bppPipeline_args_info_detailed_help[3];
-  bppPipeline_args_info_help[4] = bppPipeline_args_info_detailed_help[5];
-  bppPipeline_args_info_help[5] = bppPipeline_args_info_detailed_help[7];
-  bppPipeline_args_info_help[6] = bppPipeline_args_info_detailed_help[9];
-  bppPipeline_args_info_help[7] = bppPipeline_args_info_detailed_help[11];
-  bppPipeline_args_info_help[8] = bppPipeline_args_info_detailed_help[13];
-  bppPipeline_args_info_help[9] = bppPipeline_args_info_detailed_help[14];
-  bppPipeline_args_info_help[10] = 0; 
+  bppPipeline_args_info_help[4] = bppPipeline_args_info_detailed_help[4];
+  bppPipeline_args_info_help[5] = bppPipeline_args_info_detailed_help[5];
+  bppPipeline_args_info_help[6] = bppPipeline_args_info_detailed_help[7];
+  bppPipeline_args_info_help[7] = bppPipeline_args_info_detailed_help[9];
+  bppPipeline_args_info_help[8] = bppPipeline_args_info_detailed_help[11];
+  bppPipeline_args_info_help[9] = bppPipeline_args_info_detailed_help[13];
+  bppPipeline_args_info_help[10] = bppPipeline_args_info_detailed_help[14];
+  bppPipeline_args_info_help[11] = bppPipeline_args_info_detailed_help[16];
+  bppPipeline_args_info_help[12] = bppPipeline_args_info_detailed_help[18];
+  bppPipeline_args_info_help[13] = bppPipeline_args_info_detailed_help[19];
+  bppPipeline_args_info_help[14] = bppPipeline_args_info_detailed_help[20];
+  bppPipeline_args_info_help[15] = bppPipeline_args_info_detailed_help[22];
+  bppPipeline_args_info_help[16] = bppPipeline_args_info_detailed_help[23];
+  bppPipeline_args_info_help[17] = 0; 
   
 }
 
-const char *bppPipeline_args_info_help[11];
+const char *bppPipeline_args_info_help[18];
 
 typedef enum {ARG_NO
   , ARG_FLAG
@@ -99,6 +115,9 @@ void clear_given (struct bppPipeline_args_info *args_info)
   args_info->bound_given = 0 ;
   args_info->output_given = 0 ;
   args_info->kmer_given = 0 ;
+  args_info->keepFolds_given = 0 ;
+  args_info->input_fold_given = 0 ;
+  args_info->bound_fold_given = 0 ;
   args_info->seq_windows_given = 0 ;
   args_info->bin_given = 0 ;
   args_info->frq_given = 0 ;
@@ -116,6 +135,11 @@ void clear_args (struct bppPipeline_args_info *args_info)
   args_info->output_orig = NULL;
   args_info->kmer_arg = 3;
   args_info->kmer_orig = NULL;
+  args_info->keepFolds_flag = 0;
+  args_info->input_fold_arg = NULL;
+  args_info->input_fold_orig = NULL;
+  args_info->bound_fold_arg = NULL;
+  args_info->bound_fold_orig = NULL;
   args_info->seq_windows_arg = 20;
   args_info->seq_windows_orig = NULL;
   args_info->bin_flag = 0;
@@ -131,13 +155,16 @@ void init_args_info(struct bppPipeline_args_info *args_info)
   args_info->help_help = bppPipeline_args_info_detailed_help[0] ;
   args_info->detailed_help_help = bppPipeline_args_info_detailed_help[1] ;
   args_info->version_help = bppPipeline_args_info_detailed_help[2] ;
-  args_info->input_help = bppPipeline_args_info_detailed_help[3] ;
-  args_info->bound_help = bppPipeline_args_info_detailed_help[5] ;
-  args_info->output_help = bppPipeline_args_info_detailed_help[7] ;
-  args_info->kmer_help = bppPipeline_args_info_detailed_help[9] ;
-  args_info->seq_windows_help = bppPipeline_args_info_detailed_help[11] ;
-  args_info->bin_help = bppPipeline_args_info_detailed_help[13] ;
-  args_info->frq_help = bppPipeline_args_info_detailed_help[14] ;
+  args_info->input_help = bppPipeline_args_info_detailed_help[5] ;
+  args_info->bound_help = bppPipeline_args_info_detailed_help[7] ;
+  args_info->output_help = bppPipeline_args_info_detailed_help[9] ;
+  args_info->kmer_help = bppPipeline_args_info_detailed_help[11] ;
+  args_info->keepFolds_help = bppPipeline_args_info_detailed_help[13] ;
+  args_info->input_fold_help = bppPipeline_args_info_detailed_help[14] ;
+  args_info->bound_fold_help = bppPipeline_args_info_detailed_help[16] ;
+  args_info->seq_windows_help = bppPipeline_args_info_detailed_help[20] ;
+  args_info->bin_help = bppPipeline_args_info_detailed_help[22] ;
+  args_info->frq_help = bppPipeline_args_info_detailed_help[23] ;
   
 }
 
@@ -246,6 +273,10 @@ bppPipeline_cmdline_parser_release (struct bppPipeline_args_info *args_info)
   free_string_field (&(args_info->output_arg));
   free_string_field (&(args_info->output_orig));
   free_string_field (&(args_info->kmer_orig));
+  free_string_field (&(args_info->input_fold_arg));
+  free_string_field (&(args_info->input_fold_orig));
+  free_string_field (&(args_info->bound_fold_arg));
+  free_string_field (&(args_info->bound_fold_orig));
   free_string_field (&(args_info->seq_windows_orig));
   
   
@@ -296,6 +327,12 @@ bppPipeline_cmdline_parser_dump(FILE *outfile, struct bppPipeline_args_info *arg
     write_into_file(outfile, "output", args_info->output_orig, 0);
   if (args_info->kmer_given)
     write_into_file(outfile, "kmer", args_info->kmer_orig, 0);
+  if (args_info->keepFolds_given)
+    write_into_file(outfile, "keepFolds", 0, 0 );
+  if (args_info->input_fold_given)
+    write_into_file(outfile, "input-fold", args_info->input_fold_orig, 0);
+  if (args_info->bound_fold_given)
+    write_into_file(outfile, "bound-fold", args_info->bound_fold_orig, 0);
   if (args_info->seq_windows_given)
     write_into_file(outfile, "seq-windows", args_info->seq_windows_orig, 0);
   if (args_info->bin_given)
@@ -1166,6 +1203,9 @@ bppPipeline_cmdline_parser_internal (
         { "bound",	1, NULL, 'b' },
         { "output",	1, NULL, 'o' },
         { "kmer",	1, NULL, 'k' },
+        { "keepFolds",	0, NULL, 0 },
+        { "input-fold",	1, NULL, 0 },
+        { "bound-fold",	1, NULL, 0 },
         { "seq-windows",	2, NULL, 'w' },
         { "bin",	0, NULL, 0 },
         { "frq",	0, NULL, 0 },
@@ -1271,9 +1311,52 @@ bppPipeline_cmdline_parser_internal (
             exit (EXIT_SUCCESS);
           }
 
+          /* Keep the base-pair probability of the folded sequences in a file.
+.  */
+          if (strcmp (long_options[option_index].name, "keepFolds") == 0)
+          {
+          
+          
+            if (update_arg((void *)&(args_info->keepFolds_flag), 0, &(args_info->keepFolds_given),
+                &(local_args_info.keepFolds_given), optarg, 0, 0, ARG_FLAG,
+                check_ambiguity, override, 1, 0, "keepFolds", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          /* Set the file for the control sequences with the base-pair probabilities pre-calculated.
+.  */
+          else if (strcmp (long_options[option_index].name, "input-fold") == 0)
+          {
+          
+          
+            if (update_arg( (void *)&(args_info->input_fold_arg), 
+                 &(args_info->input_fold_orig), &(args_info->input_fold_given),
+                &(local_args_info.input_fold_given), optarg, 0, 0, ARG_STRING,
+                check_ambiguity, override, 0, 0,
+                "input-fold", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          /* Set the file for the protein bound sequences with the base-pair probabilities pre-calculated.
+.  */
+          else if (strcmp (long_options[option_index].name, "bound-fold") == 0)
+          {
+          
+          
+            if (update_arg( (void *)&(args_info->bound_fold_arg), 
+                 &(args_info->bound_fold_orig), &(args_info->bound_fold_given),
+                &(local_args_info.bound_fold_given), optarg, 0, 0, ARG_STRING,
+                check_ambiguity, override, 0, 0,
+                "bound-fold", '-',
+                additional_error))
+              goto failure;
+          
+          }
           /* Produce bin file.
 .  */
-          if (strcmp (long_options[option_index].name, "bin") == 0)
+          else if (strcmp (long_options[option_index].name, "bin") == 0)
           {
           
           
