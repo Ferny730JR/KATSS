@@ -22,6 +22,8 @@ struct options {
     char    *out_file;
     int     output_given;
     int     kmer;
+    char    file_delimiter;
+
     int     keepFolds;
     FILE    *folds_file;
     int     input_fold;
@@ -51,8 +53,8 @@ int compare(const void  *a,
 
 
 void bppHashTable_to_file(bppHashTable *table, 
-                           char         *name, 
-                           char         *file_extension);
+                          char *name, 
+                          char file_delimiter);
 
 
 void print_table_to_file(bppHashTable   *table, 
@@ -88,6 +90,9 @@ bppHashTable getBPPEnrichment(bppHashTable  *control_frq,
                               int           kmer);
 
 
+char delimiter_to_char(char *user_delimiter);
+
+
 void line_w_bpp_error_handling(int error, char *filename);
 
 
@@ -99,6 +104,7 @@ void init_default_options(struct options *opt) {
     opt->out_file       = "rna";
     opt->output_given   = 0;
     opt->kmer           = 3;
+    opt->file_delimiter = ',';
 
     opt->keepFolds      = 0;
     opt->input_fold     = 0;
@@ -170,6 +176,10 @@ int main(int argc, char **argv) {
         opt.kmer = args_info.kmer_arg;
     }
 
+    if(args_info.file_delimiter_given) {
+        opt.file_delimiter = delimiter_to_char(args_info.file_delimiter_arg);
+    }
+
     if(args_info.keepFolds_given) {
         opt.keepFolds = 1;
     }
@@ -215,7 +225,7 @@ int main(int argc, char **argv) {
 
     enrichments_table = getBPPEnrichment(&control_table, &bounds_table, opt.kmer);
 
-    bppHashTable_to_file(&enrichments_table, opt.out_file, ".csv"); // TODO: implement proper method for changing file extension
+    bppHashTable_to_file(&enrichments_table, opt.out_file, opt.file_delimiter);
 
     /* Clean up */
     free_hash_table(&control_table);
@@ -359,7 +369,6 @@ int process_line_with_bpp(char *line, bppHashTable counts_table, int kmer) {
             return 1;   // segmentation fault: still in loop but data is null
         }
 
-        printf("asdf\n");
         bpp = atof(data);
         token_bpp_values[token_count++]=bpp;
         data = strtok(NULL, " ");
@@ -528,6 +537,39 @@ bppHashTable getBPPEnrichment(bppHashTable *control_frq,
 #  Helper Functions                                        #
 ##########################################################*/
 
+char delimiter_to_char(char *user_delimiter) {
+    char delimiter;
+    char provided_val = user_delimiter[0];
+    if(strlen(user_delimiter)>1) {
+        provided_val = 0;
+    }
+
+    switch(provided_val) {
+        case ',':
+            delimiter = ',';
+            break;
+        case 't':
+            delimiter = '\t';
+            break;
+        case ':':
+            delimiter = ':';
+            break;
+        case '|':
+            delimiter = '|';
+            break;
+        case ' ':
+            delimiter = ' ';
+            break;
+        default:
+            warning_message("Provided delimiter '%s' is not valid. Defaulting to ','",
+            user_delimiter);
+            delimiter = ',';
+    }
+
+    return delimiter;
+}
+
+
 void line_w_bpp_error_handling(int error, char* filename) {
     switch(error) {
         case 0:
@@ -553,24 +595,15 @@ int compare(const void *a, const void *b) {
 }
 
 
-void bppHashTable_to_file(bppHashTable *table, char *name, char *file_extension) {
-    size_t name_len = strlen(name);
-    size_t extension_len = strlen(file_extension);
-    char *filename = malloc(name_len + extension_len + 1);
-
-    memcpy(filename, name, name_len);
-    memcpy(filename + name_len, file_extension, extension_len + 1);
+void bppHashTable_to_file(bppHashTable *table, char *name, char file_delimiter) {
+    char *filename = concat(name, ".dsv");
     
     FILE *table_file = fopen(filename, "w");
     if (table_file == NULL) {
         error_message("Could not write to file '%s'\n",filename);
     }
     
-    if(strcmp(file_extension, ".csv") == 0) {
-        print_table_to_file(table, table_file, ',');
-    } else if(strcmp(file_extension, ".tsv") == 0) {
-        print_table_to_file(table, table_file, '\t');
-    }
+    print_table_to_file(table, table_file, file_delimiter);
 
     free(filename);
     fclose(table_file);
