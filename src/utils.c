@@ -35,7 +35,7 @@ void warning_message(const char *format, ...) {
 
 
 void _warning_message(const char *format, va_list args) {
-    fprintf(stderr, ANSI_COLOR_RED "ERROR: " ANSI_COLOR_RESET ANSI_COLOR_BRIGHT);
+    fprintf(stderr, ANSI_COLOR_RED "WARNING: " ANSI_COLOR_RESET ANSI_COLOR_BRIGHT);
     vfprintf(stderr, format, args);
     fprintf(stderr, ANSI_COLOR_RESET "\n");
 }
