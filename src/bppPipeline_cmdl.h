@@ -64,6 +64,12 @@ struct bppPipeline_args_info
  original value given at command line.  */
   const char *kmer_help; /**< @brief Set the length of k-mers.
  help description.  */
+  char * file_delimiter_arg;	/**< @brief Set the delimiter used to separate the values in the output file.
+ (default=',').  */
+  char * file_delimiter_orig;	/**< @brief Set the delimiter used to separate the values in the output file.
+ original value given at command line.  */
+  const char *file_delimiter_help; /**< @brief Set the delimiter used to separate the values in the output file.
+ help description.  */
   int keepFolds_flag;	/**< @brief Keep the base-pair probability of the folded sequences in a file.
  (default=off).  */
   const char *keepFolds_help; /**< @brief Keep the base-pair probability of the folded sequences in a file.
@@ -102,6 +108,7 @@ struct bppPipeline_args_info
   unsigned int bound_given ;	/**< @brief Whether bound was given.  */
   unsigned int output_given ;	/**< @brief Whether output was given.  */
   unsigned int kmer_given ;	/**< @brief Whether kmer was given.  */
+  unsigned int file_delimiter_given ;	/**< @brief Whether file-delimiter was given.  */
   unsigned int keepFolds_given ;	/**< @brief Whether keepFolds was given.  */
   unsigned int input_fold_given ;	/**< @brief Whether input-fold was given.  */
   unsigned int bound_fold_given ;	/**< @brief Whether bound-fold was given.  */

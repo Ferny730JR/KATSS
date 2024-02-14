@@ -48,6 +48,17 @@ int
 default="3"
 optional
 
+option "file-delimiter" d
+"Set the delimiter used to separate the values in the output file.\n"
+details="The output of the BPP Pipeline by default is in csv format, meaning the values are comma\
+ delimited. By specifying this option, you can change the delimiter used to separate the values.\
+ The available delimiters are: comma (,), tab ('t'), colon (:), vertical bar (|), and space\
+ (\" \") For example, setting `--file-delimiter=\" \"' will change the delimiter to be space separated. Support for other delimiters is currently unavailable.\n"
+string
+typestr="CHAR"
+default=","
+optional
+
 option "keepFolds" -
 "Keep the base-pair probability of the folded sequences in a file.\n"
 flag
