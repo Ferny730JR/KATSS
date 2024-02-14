@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "utils.h"
+#include "string_utils.h"
 
 char* substr(char *sequence, int start, int length) {
     
@@ -11,8 +12,9 @@ char* substr(char *sequence, int start, int length) {
     int     seq_length = strlen(sequence);
     int     substr_max_length = seq_length - start;
 
-    if(!sequence)
+    if(!sequence) {
         error_message("Unable to read string %s",sequence);
+    }
     
     if(length > substr_max_length) {
         memcpy(substring, &sequence[start], substr_max_length);
@@ -26,9 +28,33 @@ char* substr(char *sequence, int start, int length) {
 }
 
 
+char* prefix_of_str(char* str) {
+    char *prefix;
+
+    prefix = strtok(str, ".");
+
+    return strdup(prefix);
+}
+
+
+char* concat(const char *s1, const char *s2) {
+    const size_t len1 = strlen(s1);
+    const size_t len2 = strlen(s2);
+    char *result = malloc(len1 + len2 + 1); // +1 for the null-terminator
+    if(!result) {
+        error_message("Failed to allocate memory for concatenation of '%s' and '%s'.",s1,s2);
+    }
+
+    memcpy(result, s1, len1);
+    memcpy(result + len1, s2, len2 + 1); // +1 to copy the null-terminator
+    return result;
+}
+
+
 void seq_to_upper(char *sequence) {
-    if(!sequence) 
+    if(!sequence) {
         error_message("Unable to read string %s",sequence);
+    }
 
     for(int i=0; sequence[i]; i++) {
         sequence[i] = toupper(sequence[i]);
@@ -39,15 +65,16 @@ void seq_to_upper(char *sequence) {
 void seq_to_RNA(char *sequence) {
     unsigned int i;
 
-    if(!sequence)
+    if(!sequence) {
         error_message("Unable to read string %s",sequence);
+    }
 
     for (i = 0; sequence[i]; i++) {
-        if (sequence[i] == 'T')
+        if (sequence[i] == 'T') {
             sequence[i] = 'U';
-
-        if (sequence[i] == 't')
+        } else if (sequence[i] == 't') {
             sequence[i] = 'u';
+        }
     }
 }
 
@@ -56,8 +83,9 @@ void remove_escapes(char *sequence) {
 
     int ln = strlen(sequence)-1;
 
-    if (sequence[ln] == '\n')   // remove trailing new line character
+    if (sequence[ln] == '\n') {  // remove trailing new line character
         sequence[ln] = '\0';
+    }
     
     while(isspace(*sequence)) {  // move pointer past white space
         ++sequence;
