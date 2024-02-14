@@ -12,4 +12,6 @@
 
 void error_message(const char *format, ...);
 
+void warning_message(const char *format, ...);
+
 #endif
