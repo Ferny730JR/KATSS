@@ -15,85 +15,88 @@ unsigned int hash(const char *key) {
     return hash_value;
 }
 
-bppHashTable init_hash_table(int kmer) {
+bppHashTable *init_hash_table(int kmer) {
     size_t table_size = 1 << (2 * kmer); // 4^kmer
-    bppHashTable hash_table;
-    hash_table.size = table_size;
-    hash_table.entries = malloc(table_size * sizeof(Entry));
-    hash_table.keys = (char**)malloc(table_size * sizeof(char*));
+    bppHashTable *hash_table = (bppHashTable*)malloc(sizeof(bppHashTable));
+    hash_table->size = table_size;
+    hash_table->entries = malloc(table_size * sizeof(Entry));
 
-    if (!hash_table.entries) {
-        perror("Failed to allocate memory for hash table");
+    if (!hash_table->entries) {
+        perror("Failed to allocate memory for hash table entries");
         exit(EXIT_FAILURE);
     }
 
     for (size_t i = 0; i < table_size; i++) {
-        hash_table.keys[i] = NULL;
-        hash_table.entries[i].key = NULL;
-        hash_table.entries[i].data.values = malloc((kmer+1) * sizeof(double));
-
-        if (!hash_table.entries[i].data.values) {
-            perror("Failed to allocate memory for values array");
-            exit(EXIT_FAILURE);
-        }
-
-        for (int j = 0; j < kmer+1; j++) {
-            hash_table.entries[i].data.values[j] = 0.0;
-        }
-    }
-
-    for (int i = 0; i < table_size; i++) {
-        hash_table.keys[i] = (char*)malloc((kmer + 1) * sizeof(char));
-        hash_table.entries[i].key = malloc((kmer + 1) * sizeof(char));
-        if (!hash_table.entries[i].key || !hash_table.keys[i]) {
-            perror("Failed to allocate memory for key(s)");
-            exit(EXIT_FAILURE);
-        }
-
-        int index = i;
-        for (int j = kmer - 1; j >= 0; j--) {
-            hash_table.entries[i].key[j] = BASES[index % 4];
-            hash_table.keys[i][j] = BASES[index % 4];
-            index /= 4;
-        }
-        hash_table.entries[i].key[kmer] = '\0';
+        hash_table->entries[i] = NULL;
     }
 
     return hash_table;
 }
 
-void free_hash_table(bppHashTable *hash_table) {
-    for (size_t i = 0; i < hash_table->size; i++) {
-        free(hash_table->keys[i]);
-        free(hash_table->entries[i].key);
-        free(hash_table->entries[i].data.values);
+Entry *create_entry(const char *key) {
+    Entry *entry = (Entry*)malloc(sizeof(Entry));
+    entry->key = strdup(key);
+    entry->values = calloc((strlen(key)+1), sizeof(float));
+
+    if(!entry->values) {
+        perror("Failed to allocate memory for values array");
+        exit(EXIT_FAILURE);
     }
-    free(hash_table->keys);
-    free(hash_table->entries);
+
+    return entry;
 }
 
-double *get(bppHashTable *hash_table, const char *key) {
+void free_entry(Entry *entry) {
+    free(entry->key);
+    free(entry->values);
+    free(entry);
+}
+
+void free_hash_table(bppHashTable *hash_table) {
+    for (size_t i = 0; i < hash_table->size; i++) {
+        if(hash_table->entries[i]) {
+            free_entry(hash_table->entries[i]);
+        }
+    }
+    free(hash_table->entries);
+    free(hash_table);
+}
+
+float *get(bppHashTable *hash_table, const char *key) {
     unsigned int index = hash(key);
-    if (strcmp(hash_table->entries[index].key, key) == 0) {
-        return hash_table->entries[index].data.values;
+    if (strcmp(hash_table->entries[index]->key, key) == 0) {
+        return hash_table->entries[index]->values;
     }
     exit(EXIT_FAILURE);
 }
 
-void addValue(bppHashTable *hash_table, const char *key, double value, int value_index) {
+void addValue(bppHashTable *hash_table, const char *key, float value, int value_index) {
     unsigned int index = hash(key);
-    if (strcmp(hash_table->entries[index].key, key) == 0) {
-        hash_table->entries[index].data.values[value_index] += value;
+
+    if(hash_table->entries[index] == NULL) { // make new entry if not initialized
+        Entry *new_item = create_entry(key);
+        hash_table->entries[index] = new_item;
+    }
+
+    if (strcmp(hash_table->entries[index]->key, key) == 0) {
+        hash_table->entries[index]->values[value_index] += value;
         return;
     }
     exit(EXIT_FAILURE);
 }
 
 void printBPPHashTable(bppHashTable *hash_table, int kmer) {
+    printf("--- BEGIN HASH TABLE ---\n");
     for(size_t i = 0; i < hash_table->size; i++) {
-        printf("Key: %s, Values: ", hash_table->entries[i].key);
-        for(int j = 0; j < kmer+1; j++)
-            printf("%f ",hash_table->entries[i].data.values[j]);
+        if(hash_table->entries[i] == NULL) {
+            continue;
+        }
+        
+        printf("Key: %s, Values: ", hash_table->entries[i]->key);
+        for(int j = 0; j < kmer+1; j++) {
+            printf("%f ",hash_table->entries[i]->values[j]);
+        }
         printf("\n");
     }
+    printf("---- END HASH TABLE ----\n");
 }

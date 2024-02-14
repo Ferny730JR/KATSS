@@ -6,39 +6,33 @@
 #include <stddef.h>
 
 typedef struct {
-    double *values;
-} Data;
-
-
-typedef struct {
     char *key;
-    Data data;
+    float *values;
 } Entry;
 
 
 typedef struct {
-    size_t size;
-    Entry *entries;
-    char **keys;
+    size_t  size;
+    Entry   **entries;
 } bppHashTable;
 
 
 unsigned int hash(const char *key);
 
 
-bppHashTable init_hash_table(int kmer);
+bppHashTable *init_hash_table(int kmer);
 
 
 void free_hash_table(bppHashTable *hash_table);
 
 
-double *get(bppHashTable    *hash_table, 
+float *get(bppHashTable     *hash_table, 
             const char      *key);
 
 
 void addValue(bppHashTable  *hash_table, 
               const char    *key, 
-              double        value, 
+              float         value, 
               int           value_index);
 
 
