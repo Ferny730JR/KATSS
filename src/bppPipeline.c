@@ -4,7 +4,7 @@
 #include <math.h>
 #include <unistd.h>
 
-#include "bppHashTable.h"
+#include "kmerHashTable.h"
 #include "string_utils.h"
 #include "utils.h"
 
@@ -52,42 +52,42 @@ int compare(const void  *a,
             const void  *b);
 
 
-void bppHashTable_to_file(bppHashTable *table, 
+void bppHashTable_to_file(kmerHashTable *table, 
                           char *name, 
                           char file_delimiter);
 
 
-void print_table_to_file(bppHashTable   *table, 
+void print_table_to_file(kmerHashTable  *table,
                          FILE           *table_file,
                          char           sep);
 
 
-bppHashTable *bppCountKmers(char *filename, 
-                           struct options *opt,
-                           int folds_provided);
+kmerHashTable *bppCountKmers(char *filename, 
+                             struct options *opt,
+                             int folds_provided);
 
 
-void process_line(char *sequence, 
-                  bppHashTable *counts_table, 
-                  struct options *opt);
+void process_line(char              *sequence, 
+                  kmerHashTable     *counts_table, 
+                  struct options    *opt);
 
 
 int process_line_with_bpp(char          *line, 
-                           bppHashTable *counts_table, 
-                           int          kmer);
+                          kmerHashTable *counts_table, 
+                          int           kmer);
 
 
-void process_windows(char *sequence,
-                     bppHashTable *counts_table,
+void process_windows(char           *sequence,
+                     kmerHashTable  *counts_table,
                      struct options *opt);
 
 
-void getFrequencies(bppHashTable *counts_table);
+void getFrequencies(kmerHashTable *counts_table);
 
 
-bppHashTable *getBPPEnrichment(bppHashTable *control_frq, 
-                              bppHashTable  *bound_frq, 
-                              int           kmer);
+kmerHashTable *getBPPEnrichment(kmerHashTable *control_frq, 
+                                kmerHashTable *bound_frq, 
+                                int kmer);
 
 
 char delimiter_to_char(char *user_delimiter);
@@ -125,9 +125,9 @@ int main(int argc, char **argv) {
     // Declare variables
     struct bppPipeline_args_info    args_info;
     struct options                  opt;
-    bppHashTable                    *bounds_table;
-    bppHashTable                    *control_table;
-    bppHashTable                    *enrichments_table;
+    kmerHashTable                   *bounds_table;
+    kmerHashTable                   *control_table;
+    kmerHashTable                   *enrichments_table;
 
     init_default_options(&opt);
 
@@ -230,9 +230,9 @@ int main(int argc, char **argv) {
     bppHashTable_to_file(enrichments_table, opt.out_file, opt.file_delimiter);
 
     /* Clean up */
-    free_hash_table(control_table);
-    free_hash_table(bounds_table);
-    free_hash_table(enrichments_table);
+    free_kmer_table(control_table);
+    free_kmer_table(bounds_table);
+    free_kmer_table(enrichments_table);
     free_options(&opt);
 
     return 0;
@@ -267,11 +267,11 @@ float* getPositionalProbabilities(char *sequence) {
 }
 
 
-bppHashTable *bppCountKmers(char *filename, struct options *opt, int folds_provided) {
-    bppHashTable    *counts_table;
+kmerHashTable *bppCountKmers(char *filename, struct options *opt, int folds_provided) {
+    kmerHashTable   *counts_table;
     FILE            *read_file;
 
-    counts_table = init_hash_table(opt->kmer);
+    counts_table = init_bpp_table(opt->kmer);
     read_file = fopen(filename, "r");
 
     if(opt->keepFolds) {
@@ -315,7 +315,7 @@ bppHashTable *bppCountKmers(char *filename, struct options *opt, int folds_provi
 }
 
 
-void process_line(char *sequence, bppHashTable *counts_table, struct options *opt) {
+void process_line(char *sequence, kmerHashTable *counts_table, struct options *opt) {
     float   *positional_probabilities;
     char    *k_substr;
     int     seq_length = strlen(sequence);
@@ -327,11 +327,11 @@ void process_line(char *sequence, bppHashTable *counts_table, struct options *op
         // Get kmer substring
         k_substr = substr(sequence, i, opt->kmer);
   
-        addValue(counts_table, k_substr, 1, opt->kmer);
+        kmer_add_value(counts_table, k_substr, 1, opt->kmer);
         
         // Loop through bpp values in file
         for(int j=i; j<opt->kmer+i; j++) {
-            addValue(counts_table, k_substr, positional_probabilities[j], j-i);
+            kmer_add_value(counts_table, k_substr, positional_probabilities[j], j-i);
         }
 
         free(k_substr);
@@ -349,7 +349,7 @@ void process_line(char *sequence, bppHashTable *counts_table, struct options *op
 }
 
 
-int process_line_with_bpp(char *line, bppHashTable *counts_table, int kmer) {
+int process_line_with_bpp(char *line, kmerHashTable *counts_table, int kmer) {
     char    *data;
     char    *sequence;
     char    *k_substr;
@@ -378,11 +378,11 @@ int process_line_with_bpp(char *line, bppHashTable *counts_table, int kmer) {
 
     for(int i=0; i<num_kmers_in_seq; i++) {
         k_substr = substr(sequence, i, kmer);
-        addValue(counts_table, k_substr, 1, kmer); // increase count by 1 for kmer
+        kmer_add_value(counts_table, k_substr, 1, kmer); // increase count by 1 for kmer
         
         // Loop through bpp values in file
         for(int j=i; j<kmer+i; j++) {
-            addValue(counts_table, k_substr, token_bpp_values[j], j-i);
+            kmer_add_value(counts_table, k_substr, token_bpp_values[j], j-i);
         }
 
         free(k_substr);
@@ -393,7 +393,7 @@ int process_line_with_bpp(char *line, bppHashTable *counts_table, int kmer) {
 }
 
 
-void process_windows(char *sequence, bppHashTable *counts_table, struct options *opt) {
+void process_windows(char *sequence, kmerHashTable *counts_table, struct options *opt) {
     char    *k_substr;
     char    *window_seq;
     float   *window_probabilities;
@@ -450,11 +450,11 @@ void process_windows(char *sequence, bppHashTable *counts_table, struct options 
         // Get kmer substring
         k_substr = substr(sequence, i, opt->kmer);
   
-        addValue(counts_table, k_substr, 1, opt->kmer);
+        kmer_add_value(counts_table, k_substr, 1, opt->kmer);
         
         // Loop through bpp values in file
         for(int j=i; j<opt->kmer+i; j++) {
-            addValue(counts_table, k_substr, positional_probabilities[j], j-i);
+            kmer_add_value(counts_table, k_substr, positional_probabilities[j], j-i);
         }
 
         free(k_substr);
@@ -470,47 +470,43 @@ void process_windows(char *sequence, bppHashTable *counts_table, struct options 
 }
 
 
-void getFrequencies(bppHashTable *counts_table) {
-
-    int num_columns = strlen(counts_table->entries[0]->key);
+void getFrequencies(kmerHashTable *counts_table) {
+    int num_columns = counts_table->cols-1;
     int total_count;
 
-    for(int i=0; i<counts_table->size; i++) {
+    for(int i=0; i<counts_table->capacity; i++) {
         if( !counts_table->entries[i] || counts_table->entries[i]->values[num_columns]<1) {
             continue;
         }
         for(int j=0; j<num_columns; j++) {
-            total_count=counts_table->entries[i]->values[num_columns];
+            total_count=(int)counts_table->entries[i]->values[num_columns];
             counts_table->entries[i]->values[j]/=total_count;
         }
     }
 }
 
 
-bppHashTable *getBPPEnrichment(bppHashTable *control_frq, 
-                              bppHashTable *bound_frq, 
-                              int kmer) {
-
-    bppHashTable    *enrichments_table;
+kmerHashTable *getBPPEnrichment(kmerHashTable *control_frq, kmerHashTable *bound_frq, int kmer) {
+    kmerHashTable   *enrichments_table;
     char            *key; 
-    float           enrichment;
-    float           *bound_values;
-    float           *control_values;
-    float           *enrichment_values;
-    float           mean_enrichment;
+    double          enrichment;
+    double          *bound_values;
+    double          *control_values;
+    double          *enrichment_values;
+    double          mean_enrichment;
 
-    enrichments_table = init_hash_table(kmer);
+    enrichments_table = init_bpp_table(kmer);
 
     // Get the log2 fold change for each kmer
-    for(size_t i = 0; i < bound_frq->size; i++) {
+    for(size_t i = 0; i < bound_frq->capacity; i++) {
         if(bound_frq->entries[i] == NULL || control_frq->entries[i] == NULL) {
             continue;
         }
 
         key = bound_frq->entries[i]->key;
 
-        bound_values   =    get(bound_frq, key);
-        control_values =    get(control_frq, key);
+        bound_values   = kmer_get(bound_frq, key);
+        control_values = kmer_get(control_frq, key);
 
         for(int j = 0; j < kmer; j++) {
             if(bound_values[j] == 0.0f || control_values[j] == 0.0f) {
@@ -518,17 +514,17 @@ bppHashTable *getBPPEnrichment(bppHashTable *control_frq,
             } else {
                 enrichment = logf(bound_values[j]/control_values[j])/logf(2.0f);
             }
-            addValue(enrichments_table, key, enrichment, j);
+            kmer_add_value(enrichments_table, key, enrichment, j);
         }
     }
 
-    for(size_t i = 0; i < enrichments_table->size; i++) {
+    for(size_t i = 0; i < enrichments_table->capacity; i++) {
         if(enrichments_table->entries[i] == NULL) {
             continue;
         }
 
         key = enrichments_table->entries[i]->key;
-        enrichment_values = get(enrichments_table, key);
+        enrichment_values = kmer_get(enrichments_table, key);
 
         mean_enrichment = 0.0f;
         for(int j = 0; j < kmer; j++) {
@@ -536,10 +532,10 @@ bppHashTable *getBPPEnrichment(bppHashTable *control_frq,
         }
 
         mean_enrichment/=kmer;
-        addValue(enrichments_table, key, mean_enrichment, kmer);
+        kmer_add_value(enrichments_table, key, mean_enrichment, kmer);
     }
 
-    qsort(enrichments_table->entries, enrichments_table->size,
+    qsort(enrichments_table->entries, enrichments_table->capacity,
           sizeof(*enrichments_table->entries), compare);
 
     return enrichments_table;
@@ -594,8 +590,8 @@ void line_w_bpp_error_handling(int error, char* filename) {
     }
 }
 
-int compare(const void *a, const void *b) {
 
+int compare(const void *a, const void *b) {
     const Entry *entryA = *(Entry **)a;
     const Entry *entryB = *(Entry **)b;
 
@@ -621,7 +617,7 @@ int compare(const void *a, const void *b) {
 }
 
 
-void bppHashTable_to_file(bppHashTable *table, char *name, char file_delimiter) {
+void bppHashTable_to_file(kmerHashTable *table, char *name, char file_delimiter) {
     char *filename = concat(name, ".dsv");
     
     FILE *table_file = fopen(filename, "w");
@@ -636,16 +632,14 @@ void bppHashTable_to_file(bppHashTable *table, char *name, char file_delimiter) 
 }
 
 
-void print_table_to_file(bppHashTable *table, FILE *table_file, char sep) {
-
-    //int num_columns = strlen(table->entries[0]->key) + 1;
-    for(size_t i = 0; i < table->size; i++) {
+void print_table_to_file(kmerHashTable *table, FILE *table_file, char sep) {
+    for(size_t i = 0; i < table->capacity; i++) {
         if(table->entries[i] == NULL) {
             continue;
         }
 
         fprintf(table_file, "%s", table->entries[i]->key);
-        for(size_t j = 0; j < strlen(table->entries[i]->key)+1; j++) {
+        for(size_t j = 0; j < table->cols; j++) {
             fprintf(table_file, "%c%9.6f", sep, table->entries[i]->values[j]);
         }
         fprintf(table_file,"\n");
