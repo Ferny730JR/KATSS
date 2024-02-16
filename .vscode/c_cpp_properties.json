@@ -3,7 +3,10 @@
         {
             "name": "Mac",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/src/SKA",
+                "${workspaceFolder}/src/bppPipeline",
             ],
             "defines": [],
             "macFrameworkPath": [
@@ -11,7 +14,8 @@
             ],
             "cStandard": "c17",
             "cppStandard": "c++17",
-            "intelliSenseMode": "macos-clang-arm64"
+            "intelliSenseMode": "macos-clang-arm64",
+            "compilerPath": "/usr/bin/clang"
         }
     ],
     "version": 4

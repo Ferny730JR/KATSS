@@ -1,0 +1,72 @@
+package "Streaming K-mer Analysis"
+
+purpose "RNA motif discovery tool"
+
+usage "SKA [OPTIONS] [<input.fa>] [<bound.fa>]"
+
+version "1.0"
+
+args "--file-name=SKA_cmdl --include-getopt --default-optional --unamed-opts --func-name=SKA_cmdline_parser --arg-struct-name=SKA_args_info"
+
+description "The Streaming K-mer Analysis is a C program designed to analyze RNA sequences and identify enriched motifs in protein-bound RNA.\n\
+ The program follows a structured pipeline that includes k-mer counting, frequency calculations, and enrichment analysis, producing a CSV file with ranked k-mers based on their likelihood of being a motif."
+
+
+section "I/O Options"
+sectiondesc="Command line options for input and output processing.\n\n"
+
+option "input" i
+"Read the controls sequences file.\n"
+details="SKA by default reads the positional arguments that follow the SKA\
+ command, or reading from stdin. By using this option, you can specify which file you want to be\
+ the control sequences. Note that you can only pass one control file in the command.\n"
+string
+typestr="filename"
+optional
+
+option "bound" b
+"Read the protein bound RNA sequences file.\n"
+details="SKA by default reads the positional arguments that follow the SKA\
+ command, or reading from stdin. By using this option, you can specify which file you want to be\
+ the bound sequences. The bound sequences are the RNA sequences in which a protein was\
+ experimentally found to bind towards. Note that you can only pass one bound file in the\
+ command.\n"
+string
+typestr="filename"
+optional
+
+option "output" o
+"Set the name of the output files.\n"
+details="Specify the default name for the output file. If this option is not used, the default name is \"motif.dsv\".\n"
+string
+typestr="filename"
+optional
+
+option "kmer" k
+"Set the length of k-mers.\n"
+details="Specify the length of the k-mers you want to perform the enrichment analysis on.\n"
+int
+default="5"
+optional
+
+option "file-delimiter" d
+"Set the delimiter used to separate the values in the output file.\n"
+details="The output of SKA by default is in csv format, meaning the values are comma\
+ delimited. By specifying this option, you can change the delimiter used to separate the values.\
+ The available delimiters are: comma (,), tab ('t'), colon (:), vertical bar (|), and space\
+ (\" \") For example, setting `--file-delimiter=\" \"' will change the delimiter to be space separated. Support for other delimiters is currently unavailable.\n"
+string
+typestr="char"
+default=","
+optional
+
+
+section "Algorithms"
+sectiondesc="Select additional algorithms to determine the calculations.\n\n"
+
+option "independent-probs" p
+"Calculate the enrichments without the input reads.\n"
+details="Detailed description.\n"
+flag
+off
+
