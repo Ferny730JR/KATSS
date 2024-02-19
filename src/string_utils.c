@@ -56,13 +56,13 @@ char* concat(const char *s1, const char *s2) {
 }
 
 
-void seq_to_upper(char *sequence) {
-    if(!sequence) {
-        error_message("Unable to read string %s",sequence);
+void str_to_upper(char *str) {
+    if(!str) {
+        error_message("Unable to read string %s",str);
     }
 
-    for(int i=0; sequence[i]; i++) {
-        sequence[i] = toupper(sequence[i]);
+    for(int i=0; str[i]; i++) {
+        str[i] = toupper(str[i]);
     }
 }
 
