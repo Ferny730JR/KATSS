@@ -10,6 +10,8 @@
 #define ANSI_COLOR_BRIGHT   "\x1b[1m"
 #define ANSI_COLOR_RESET    "\x1b[0m"
 
+#define BASES "ACGU"
+
 /**
  *  @brief Safely allocates memory
  * 

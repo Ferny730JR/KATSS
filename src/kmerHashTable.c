@@ -6,8 +6,6 @@
 #include "utils.h"
 #include "string_utils.h"
 
-#define BASES "ACGU"
-
 Entry *create_entry(const char  *key, 
                     int         col);
 
