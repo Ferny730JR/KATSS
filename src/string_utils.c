@@ -7,10 +7,15 @@
 #include "string_utils.h"
 
 char* substr(char *sequence, int start, int length) {
-    
-    char*   substring = (char*) malloc((length+1)*sizeof(char));
+    char*   substring = (char*) s_malloc((length+1)*sizeof(char));
     int     seq_length = strlen(sequence);
     int     substr_max_length = seq_length - start;
+
+    if(start < 0 || start > seq_length) {
+        warning_message("'start' value of %d not valid for sequence '%s' not valid.",start,sequence);
+        free(substring);
+        return NULL;
+    }
 
     if(!sequence) {
         error_message("Unable to read string %s",sequence);
