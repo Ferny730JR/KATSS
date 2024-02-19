@@ -4,6 +4,7 @@
 
 #include "kmerHashTable.h"
 #include "utils.h"
+#include "string_utils.h"
 
 #define BASES "ACGU"
 
@@ -102,6 +103,36 @@ void free_kmer_table(kmerHashTable *hash_table) {
     }
     free(hash_table->entries);
     free(hash_table);
+}
+
+
+void print_table_to_file(kmerHashTable *table, FILE *table_file, char sep) {
+    for(size_t i = 0; i < table->capacity; i++) {
+        if(table->entries[i] == NULL) {
+            continue;
+        }
+
+        fprintf(table_file, "%s", table->entries[i]->key);
+        for(size_t j = 0; j < table->cols; j++) {
+            fprintf(table_file, "%c%9.6f", sep, table->entries[i]->values[j]);
+        }
+        fprintf(table_file,"\n");
+    }
+}
+
+
+void kmerHashTable_to_file(kmerHashTable *table, char *name, char file_delimiter) {
+    char *filename = concat(name, ".dsv");
+    
+    FILE *table_file = fopen(filename, "w");
+    if (table_file == NULL) {
+        error_message("Could not write to file '%s'\n",filename);
+    }
+    
+    print_table_to_file(table, table_file, file_delimiter);
+
+    free(filename);
+    fclose(table_file);
 }
 
 
