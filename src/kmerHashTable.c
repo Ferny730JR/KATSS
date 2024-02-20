@@ -79,7 +79,12 @@ unsigned int hash(const char *key) {
     // Assuming the key is composed of 'A', 'U/T', 'C', 'G' characters
     unsigned int hash_value = 0;
     while (*key) {
-        hash_value = hash_value * 4 + (*key == 'A' ? 0 : (*key == 'C' ? 1 : (*key == 'G' ? 2 : 3)));
+        switch(*key) {
+            case 'A': hash_value = hash_value * 4;     break;
+            case 'C': hash_value = hash_value * 4 + 1; break;
+            case 'G': hash_value = hash_value * 4 + 2; break;
+            default : hash_value = hash_value * 4 + 3; break;
+        }
         key++;
     }
     return hash_value;
