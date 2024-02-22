@@ -7,6 +7,7 @@
                 "${workspaceFolder}/src",
                 "${workspaceFolder}/src/SKA",
                 "${workspaceFolder}/src/bppPipeline",
+                "${workspaceFolder}/src/C-Thread-Pool",
             ],
             "defines": [],
             "macFrameworkPath": [
