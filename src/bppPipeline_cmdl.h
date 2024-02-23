@@ -86,6 +86,12 @@ struct bppPipeline_args_info
  original value given at command line.  */
   const char *bound_fold_help; /**< @brief Set the file for the protein bound sequences with the base-pair probabilities pre-calculated.
  help description.  */
+  int jobs_arg;	/**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
+ (default='0').  */
+  char * jobs_orig;	/**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
+ original value given at command line.  */
+  const char *jobs_help; /**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
+ help description.  */
   int seq_windows_arg;	/**< @brief Split the sequence into sliding windows of the specified size and find the mean probability per position in the window.
  (default='20').  */
   char * seq_windows_orig;	/**< @brief Split the sequence into sliding windows of the specified size and find the mean probability per position in the window.
@@ -112,6 +118,7 @@ struct bppPipeline_args_info
   unsigned int keepFolds_given ;	/**< @brief Whether keepFolds was given.  */
   unsigned int input_fold_given ;	/**< @brief Whether input-fold was given.  */
   unsigned int bound_fold_given ;	/**< @brief Whether bound-fold was given.  */
+  unsigned int jobs_given ;	/**< @brief Whether jobs was given.  */
   unsigned int seq_windows_given ;	/**< @brief Whether seq-windows was given.  */
   unsigned int bin_given ;	/**< @brief Whether bin was given.  */
   unsigned int frq_given ;	/**< @brief Whether frq was given.  */

@@ -78,6 +78,15 @@ string
 typestr="filename"
 optional
 
+option "jobs" j
+"Separate the files into separate jobs and start processing them in parallel using multiple\
+ threads.\n"
+int
+typestr="number"
+default="0"
+argoptional
+optional
+
 section "Algorithms"
 sectiondesc="Select additional algorithms to determine the calculations.\n\n"
 
