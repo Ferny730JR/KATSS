@@ -4,7 +4,12 @@
         "bpphashtable.h": "c",
         "__locale": "c",
         "cctype": "c",
-        "locale": "c"
+        "locale": "c",
+        "__split_buffer": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c",
+        "vector": "c"
     },
     "editor.wordWrap": "wordWrapColumn",
     "editor.wordWrapColumn": 99

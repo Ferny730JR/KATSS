@@ -18,13 +18,31 @@
  * 
  *  @return Pointer to the substring
 */
-char* substr(char *sequence, int start, int length);
+char *substr(char *sequence, int start, int length);
 
 
 /**
  *  @brief Return basename of string containing filepath.
 */
-char* prefix_of_str(char* str);
+char *prefix_of_str(char* str);
+
+
+/**
+ *  @brief Get the basename prefix of a file path.
+ * 
+ *  This function removes all characters before the last occurrence of the character '/', and all
+ *  characters following the first '.'. Assuming the full_path were to be: '/usr/bin/file.txt', 
+ *  this function would return the string 'file'. If the string were to contain no '/' or '.'
+ *  characters, then it returns a copy of the string as is.
+ * 
+ *  @attention You have to free the string. Since memory is allocated to store the string, 
+ *  it is then your responsibility to free the memory when it is no longer in use.
+ * 
+ *  @param full_path    The character pointer containing the file path.
+ * 
+ *  @return Pointer to the basename prefix
+*/
+char *basename_prefix(char *full_path);
 
 
 /**
@@ -37,7 +55,7 @@ char* prefix_of_str(char* str);
  * 
  *  @return Pointer to concatenated string.
 */
-char* concat(const char *s1, const char *s2);
+char *concat(const char *s1, const char *s2);
 
 
 /**

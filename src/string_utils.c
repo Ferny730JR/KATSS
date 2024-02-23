@@ -33,7 +33,7 @@ char* substr(char *sequence, int start, int length) {
 }
 
 
-char* prefix_of_str(char* str) {
+char *prefix_of_str(char *str) {
     char *prefix;
 
     prefix = strtok(str, ".");
@@ -42,7 +42,22 @@ char* prefix_of_str(char* str) {
 }
 
 
-char* concat(const char *s1, const char *s2) {
+char *basename_prefix(char *file_path) {
+    char *basename = strrchr(file_path, '/');
+    basename++; // Move pointer to remove trailing '/'
+
+    char *ptr = basename;
+    int len = 0;
+    while(ptr[0] != '.') {
+        len++;
+        ptr++;
+    }
+
+    return substr(basename, 0, len);
+}
+
+
+char *concat(const char *s1, const char *s2) {
     const size_t len1 = strlen(s1);
     const size_t len2 = strlen(s2);
     char *result = malloc(len1 + len2 + 1); // +1 for the null-terminator
