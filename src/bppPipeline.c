@@ -7,6 +7,7 @@
 #include "kmerHashTable.h"
 #include "string_utils.h"
 #include "utils.h"
+#include "parallel_helpers.h"
 
 #include "ViennaRNA/fold.h"
 #include "ViennaRNA/part_func.h"
@@ -23,6 +24,7 @@ struct options {
     int     output_given;
     int     kmer;
     char    file_delimiter;
+    int     jobs;
 
     int     keepFolds;
     FILE    *folds_file;
@@ -34,6 +36,14 @@ struct options {
     int     bin;
     int     frq;
 };
+
+
+typedef struct {
+    char *sequence;
+    kmerHashTable *counts_table;
+    struct options *opt;
+} record_data;
+
 
 /*##########################################################
 #  Function Declarations                                   #
@@ -52,11 +62,6 @@ int compare(const void  *a,
             const void  *b);
 
 
-void bppHashTable_to_file(kmerHashTable *table, 
-                          char *name, 
-                          char file_delimiter);
-
-
 void print_table_to_file(kmerHashTable  *table,
                          FILE           *table_file,
                          char           sep);
@@ -67,9 +72,7 @@ kmerHashTable *bppCountKmers(char *filename,
                              int folds_provided);
 
 
-void process_line(char              *sequence, 
-                  kmerHashTable     *counts_table, 
-                  struct options    *opt);
+void process_line(record_data *record);
 
 
 int process_line_with_bpp(char          *line, 
@@ -90,6 +93,12 @@ kmerHashTable *getBPPEnrichment(kmerHashTable *control_frq,
                                 int kmer);
 
 
+record_data *copy_record_data(record_data *data);
+
+
+void stream_folds(char *sequence, float *positional_probabilities, struct options *opt);
+
+
 char delimiter_to_char(char *user_delimiter);
 
 
@@ -105,6 +114,7 @@ void init_default_options(struct options *opt) {
     opt->output_given   = 0;
     opt->kmer           = 3;
     opt->file_delimiter = ',';
+    opt->jobs           = 0;
 
     opt->keepFolds      = 0;
     opt->input_fold     = 0;
@@ -116,6 +126,7 @@ void init_default_options(struct options *opt) {
     opt->bin            = 0;
     opt->frq            = 0;
 }
+
 
 /*##########################################################
 #  Main                                                    #
@@ -208,6 +219,25 @@ int main(int argc, char **argv) {
         opt.window_size = args_info.seq_windows_arg;
     }
 
+    if(args_info.jobs_given) {
+        int thread_max = max_user_threads();
+
+        if (args_info.jobs_arg == 0) {
+        /* use maximum of concurrent threads */
+            int proc_cores, proc_cores_conf;
+            if (num_proc_cores(&proc_cores, &proc_cores_conf)) {
+                opt.jobs = MIN2(thread_max, proc_cores_conf);
+            } else {
+                warning_message("Could not determine number of available processor cores!\n"
+                                "Defaulting to serial computation");
+                opt.jobs = 1;
+            }
+        } else {
+            opt.jobs = MIN2(thread_max, args_info.jobs_arg);
+        }
+        opt.jobs = MAX2(1, opt.jobs);
+    }
+
     if(args_info.frq_given) {
         opt.frq = 1;
     }
@@ -222,12 +252,17 @@ int main(int argc, char **argv) {
     #  Computations                                            #
     ##########################################################*/
 
+    INIT_PARALLELIZATION(opt.jobs);
     control_table = bppCountKmers(opt.input_file, &opt, opt.input_fold);
+    UNINIT_PARALLELIZATION
+
+    INIT_PARALLELIZATION(opt.jobs);
     bounds_table  = bppCountKmers(opt.bound_file, &opt, opt.bound_fold);
+    UNINIT_PARALLELIZATION
 
     enrichments_table = getBPPEnrichment(control_table, bounds_table, opt.kmer);
 
-    bppHashTable_to_file(enrichments_table, opt.out_file, opt.file_delimiter);
+    kmerHashTable_to_file(enrichments_table, opt.out_file, opt.file_delimiter);
 
     /* Clean up */
     free_kmer_table(control_table);
@@ -239,15 +274,16 @@ int main(int argc, char **argv) {
 }
 
 
+/*##########################################################
+#  Main Functions                                          #
+##########################################################*/
+
 float* getPositionalProbabilities(char *sequence) {
     vrna_ep_t   *ptr, *pair_probabilities = NULL;
-    int         seq_length  = strlen(sequence);
-    char        *propensity = (char *)vrna_alloc(sizeof(char) * (seq_length + 1));
-    float       *positional_probabilities = malloc(seq_length * sizeof(float));
+    int         seq_length                = strlen(sequence);
+    char        *propensity               = (char *)vrna_alloc(sizeof(char) * (seq_length + 1));
+    float       *positional_probabilities = s_calloc(seq_length, sizeof(float));
     float       probability;
-
-    /* Initialize positional_probabilities array to 0's */
-    memset(positional_probabilities, 0, seq_length * sizeof(float));
 
     /* Get the pair probabilities */
     vrna_pf_fold(sequence, propensity, &pair_probabilities);
@@ -268,14 +304,19 @@ float* getPositionalProbabilities(char *sequence) {
 
 
 kmerHashTable *bppCountKmers(char *filename, struct options *opt, int folds_provided) {
+    record_data     *record;
     kmerHashTable   *counts_table;
     FILE            *read_file;
 
     counts_table = init_bpp_table(opt->kmer);
     read_file = fopen(filename, "r");
 
+    record = s_malloc(sizeof *record);
+    record->counts_table = counts_table;
+    record->opt = opt;
+
     if(opt->keepFolds) {
-        char *filename_prefix = prefix_of_str(filename);
+        char *filename_prefix = basename_prefix(filename);
         char *folds_filename = concat(filename_prefix, ".folds");
         opt->folds_file = fopen(folds_filename, "w");
 
@@ -283,27 +324,30 @@ kmerHashTable *bppCountKmers(char *filename, struct options *opt, int folds_prov
         free(folds_filename);
     }
 
-    char buffer[10000];
+    char buffer[1000];
     while (fgets(buffer, sizeof(buffer), read_file)) {
 
         // Pre processing in the line
         seq_to_RNA(buffer);
-        seq_to_upper(buffer);
+        str_to_upper(buffer);
         remove_escapes(buffer);
         
+        record->sequence = buffer;
+
         if(folds_provided) {
-            int error;
-            error = process_line_with_bpp(buffer, counts_table, opt->kmer);
+            int error = process_line_with_bpp(buffer, counts_table, opt->kmer);
             line_w_bpp_error_handling(error, filename);
 
         } else if(opt->seq_windows) {
             process_windows(buffer, counts_table, opt);
-
         } else {
-            process_line(buffer, counts_table, opt);
+            WAIT_FOR_FREE_SLOT((2 * opt->jobs) - 1);
+            RUN_IN_PARALLEL(process_line, copy_record_data(record));
         }
     }
     fclose(read_file);
+    free(record);
+    WAIT_FOR_THPOOL
 
     if(opt->keepFolds) {
         fclose(opt->folds_file);
@@ -315,10 +359,13 @@ kmerHashTable *bppCountKmers(char *filename, struct options *opt, int folds_prov
 }
 
 
-void process_line(char *sequence, kmerHashTable *counts_table, struct options *opt) {
+void process_line(record_data *record) {
+    struct  options *opt = record->opt;
+    char    *sequence = record->sequence;
+
     float   *positional_probabilities;
     char    *k_substr;
-    int     seq_length = strlen(sequence);
+    int     seq_length = strlen(record->sequence);
     int     num_kmers_in_seq = seq_length - opt->kmer + 1;
 
     positional_probabilities = getPositionalProbabilities(sequence);
@@ -327,25 +374,23 @@ void process_line(char *sequence, kmerHashTable *counts_table, struct options *o
         // Get kmer substring
         k_substr = substr(sequence, i, opt->kmer);
   
-        kmer_add_value(counts_table, k_substr, 1, opt->kmer);
+        kmer_add_value(record->counts_table, k_substr, 1, opt->kmer);
         
         // Loop through bpp values in file
         for(int j=i; j<opt->kmer+i; j++) {
-            kmer_add_value(counts_table, k_substr, positional_probabilities[j], j-i);
+            kmer_add_value(record->counts_table, k_substr, positional_probabilities[j], j-i);
         }
 
         free(k_substr);
     }
 
     if(opt->keepFolds) {
-        fprintf(opt->folds_file, "%s", sequence);
-        for(int i=0; i<seq_length; i++) {
-            fprintf(opt->folds_file, " %8.6f", positional_probabilities[i]);
-        }
-        fprintf(opt->folds_file, "\n");
+        THREADSAFE_STREAM_OUTPUT(stream_folds(sequence, positional_probabilities, opt));
     }
 
     free(positional_probabilities);
+    free(record->sequence);
+    free(record);
 }
 
 
@@ -488,7 +533,7 @@ void getFrequencies(kmerHashTable *counts_table) {
 
 kmerHashTable *getBPPEnrichment(kmerHashTable *control_frq, kmerHashTable *bound_frq, int kmer) {
     kmerHashTable   *enrichments_table;
-    char            *key; 
+    char            *key;
     double          enrichment;
     double          *bound_values;
     double          *control_values;
@@ -545,6 +590,28 @@ kmerHashTable *getBPPEnrichment(kmerHashTable *control_frq, kmerHashTable *bound
 /*##########################################################
 #  Helper Functions                                        #
 ##########################################################*/
+
+record_data *copy_record_data(record_data *data) {
+    record_data *new_data = s_malloc(sizeof *new_data);
+
+    new_data->sequence      = strdup(data->sequence);
+    new_data->opt           = data->opt;
+    new_data->counts_table  = data->counts_table;
+
+    return new_data;
+}
+
+
+void stream_folds(char *sequence, float *positional_probabilities, struct options *opt) {
+    int seq_length = strlen(sequence);
+
+    fprintf(opt->folds_file, "%s", sequence);
+    for(int i=0; i<seq_length; i++) {
+        fprintf(opt->folds_file, " %8.6f", positional_probabilities[i]);
+    }
+    fprintf(opt->folds_file, "\n");
+} 
+
 
 char delimiter_to_char(char *user_delimiter) {
     char delimiter;
@@ -614,36 +681,6 @@ int compare(const void *a, const void *b) {
     }
 
     return 0;
-}
-
-
-void bppHashTable_to_file(kmerHashTable *table, char *name, char file_delimiter) {
-    char *filename = concat(name, ".dsv");
-    
-    FILE *table_file = fopen(filename, "w");
-    if (table_file == NULL) {
-        error_message("Could not write to file '%s'\n",filename);
-    }
-    
-    print_table_to_file(table, table_file, file_delimiter);
-
-    free(filename);
-    fclose(table_file);
-}
-
-
-void print_table_to_file(kmerHashTable *table, FILE *table_file, char sep) {
-    for(size_t i = 0; i < table->capacity; i++) {
-        if(table->entries[i] == NULL) {
-            continue;
-        }
-
-        fprintf(table_file, "%s", table->entries[i]->key);
-        for(size_t j = 0; j < table->cols; j++) {
-            fprintf(table_file, "%c%9.6f", sep, table->entries[i]->values[j]);
-        }
-        fprintf(table_file,"\n");
-    }
 }
 
 
