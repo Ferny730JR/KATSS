@@ -2,6 +2,7 @@
 #define KMER_HASH_TABLE_H
 
 #include <stddef.h>
+#include <pthread.h>
 
 /**
  *  @brief Entries for kmerHashTable data structure. Stores the key value pair, where key is a 
@@ -20,6 +21,7 @@ typedef struct {
     size_t  capacity;
     size_t  cols;
     Entry   **entries;
+    pthread_mutex_t lock;
 } kmerHashTable;
 
 
