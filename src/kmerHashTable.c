@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "kmerHashTable.h"
 #include "utils.h"
@@ -21,6 +22,7 @@ kmerHashTable *init_kmer_table(int kmer, int cols) {
     hash_table->capacity = table_size;
     hash_table->cols = cols;
     hash_table->entries = s_malloc(table_size * sizeof(Entry*));
+    pthread_mutex_init(&hash_table->lock, NULL);
 
     for (size_t i = 0; i < table_size; i++) {
         hash_table->entries[i] = NULL;
@@ -59,7 +61,9 @@ void kmer_add_value(kmerHashTable *hash_table, const char *key, double value, in
     }
 
     if (strcmp(hash_table->entries[index]->key, key) == 0) {
+        pthread_mutex_lock(&hash_table->lock);
         hash_table->entries[index]->values[value_index] += value;
+        pthread_mutex_unlock(&hash_table->lock);
         return;
     }
     exit(EXIT_FAILURE);
