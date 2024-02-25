@@ -7,6 +7,7 @@
 #include "kmerHashTable.h"
 #include "string_utils.h"
 #include "utils.h"
+#include "parallel_helpers.h"
 
 #include "SKA_cmdl.h"
 
@@ -16,10 +17,11 @@ typedef struct {
     char    *out_file;
     int     out_given;
     int     kmer;
+    int     iterations;
     char    file_delimiter;
 
     int     independent_probs;
-    int     frq;
+    int     jobs;
 } options;
 
 
@@ -30,10 +32,17 @@ typedef struct {
 } frqIndependentProbs;
 
 
+typedef struct {
+    kmerHashTable   *counts_table;
+    char            *sequence;
+    int             kmer;
+} record_data;
+
+
 kmerHashTable *count_kmers(char *filename, options *opt);
 
 
-void process_counts(char *line, kmerHashTable *counts_table, int kmer);
+void process_counts(record_data *record);
 
 
 frqIndependentProbs process_independent_probs(char *filename, options *opt);
@@ -69,10 +78,11 @@ void init_default_options(options *opt) {
     opt->out_file       = "motif";
     opt->out_given      = 0;
     opt->kmer           = 3;
+    opt->iterations     = 1;
     opt->file_delimiter = ',';
 
     opt->independent_probs  = 0;
-    opt->frq                = 0;
+    opt->jobs               = 0;
 }
 
 
@@ -132,6 +142,17 @@ int main(int argc, char **argv) {
         opt.kmer = args_info.kmer_arg;
     }
 
+    if(args_info.iterations_given) {
+        if(args_info.iterations_arg <= 0) {
+            error_message("option '--iterations=%d' must be a value greater than 0.",
+             args_info.kmer_arg);
+            SKA_cmdline_parser_free(&args_info);
+            free_options(&opt);
+            exit(EXIT_FAILURE);
+        }
+        opt.iterations = args_info.iterations_arg;
+    }
+
     if(args_info.file_delimiter_given) {
         opt.file_delimiter = delimiter_to_char(args_info.file_delimiter_arg);
     }
@@ -140,7 +161,27 @@ int main(int argc, char **argv) {
         opt.independent_probs = 1;
     }
 
+    if(args_info.jobs_given) {
+        int thread_max = max_user_threads();
+
+        if (args_info.jobs_arg == 0) {
+        /* use maximum of concurrent threads */
+            int proc_cores, proc_cores_conf;
+            if (num_proc_cores(&proc_cores, &proc_cores_conf)) {
+                opt.jobs = MIN2(thread_max, proc_cores_conf);
+            } else {
+                warning_message("Could not determine number of available processor cores!\n"
+                                "Defaulting to serial computation");
+                opt.jobs = 1;
+            }
+        } else {
+            opt.jobs = MIN2(thread_max, args_info.jobs_arg);
+        }
+        opt.jobs = MAX2(1, opt.jobs);
+    }
+
     SKA_cmdline_parser_free(&args_info);
+    print_options(&opt);
 
     /*##########################################################
     #  Computations                                            #
@@ -162,8 +203,8 @@ int main(int argc, char **argv) {
     enrichments_table = getEnrichment(input_table, bound_table, &opt);
 
     qsort(enrichments_table->entries, enrichments_table->capacity,
-          sizeof(*enrichments_table->entries), compare);
-
+        sizeof(*enrichments_table->entries), compare);
+    
     kmerHashTable_to_file(enrichments_table, opt.out_file, opt.file_delimiter);
 
     /* Clean up */
@@ -177,34 +218,39 @@ int main(int argc, char **argv) {
 kmerHashTable *count_kmers(char *filename, options *opt) {
     FILE *read_file;
     kmerHashTable *counts_table;
+    record_data *record = s_malloc(sizeof *record);
 
     counts_table = init_kmer_table(opt->kmer, 1);
     read_file    = fopen(filename, "r");
 
-    char buffer[10000];
+    record->counts_table = counts_table;
+    record->kmer = opt->kmer;
+
+    char buffer[1024];
     while(fgets(buffer, sizeof(buffer), read_file)) {
         seq_to_RNA(buffer);
         str_to_upper(buffer);
         remove_escapes(buffer);
 
-        process_counts(buffer, counts_table, opt->kmer);
+        record->sequence = buffer;
+        process_counts(record);
     }
     fclose(read_file);
+    free(record);
 
     return counts_table;
 }
 
-
-void process_counts(char *sequence, kmerHashTable *counts_table, int kmer) {
+void process_counts(record_data *record) {
     char *k_substr;
-    int seq_length = strlen(sequence);
-    int num_kmers_in_seq = seq_length - kmer + 1;
+    int seq_length = strlen(record->sequence);
+    int num_kmers_in_seq = seq_length - record->kmer + 1;
 
     for(int i=0; i<num_kmers_in_seq; i++) {
         // Get kmer substring
-        k_substr = substr(sequence, i, kmer);
+        k_substr = substr(record->sequence, i, record->kmer);
 
-        kmer_add_value(counts_table, k_substr, 1, 0);
+        kmer_add_value(record->counts_table, k_substr, 1, 0);
 
         free(k_substr);
     }
@@ -450,6 +496,7 @@ void print_options(options *opt) {
     printf("bound_file: '%s'\n",opt->bound_file);
     printf("output_file: '%s'\n",opt->out_file);
     printf("kmer: '%d'\n",opt->kmer);
-    printf("frq: '%d'\n",opt->frq);
+    printf("iterations: '%d'\n",opt->iterations);
+    printf("jobs: '%d'\n",opt->jobs);
     printf("probs: '%d'\n",opt->independent_probs);
 }
