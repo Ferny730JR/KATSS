@@ -49,6 +49,13 @@ int
 default="5"
 optional
 
+option "iterations" r
+"Set the number of iterations for SKA.\n"
+details=""
+int
+default="1"
+optional
+
 option "file-delimiter" d
 "Set the delimiter used to separate the values in the output file.\n"
 details="The output of SKA by default is in csv format, meaning the values are comma\
@@ -70,3 +77,11 @@ details="Detailed description.\n"
 flag
 off
 
+option "jobs" j
+"Separate the files into separate jobs and start processing them in parallel using multiple\
+ threads.\n"
+int
+typestr="number"
+default="0"
+argoptional
+optional

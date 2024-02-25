@@ -46,12 +46,15 @@ const char *SKA_args_info_detailed_help[] = {
   "  Specify the default name for the output file. If this option is not used, the\n  default name is \"motif.dsv\".\n",
   "  -k, --kmer=INT             Set the length of k-mers.\n                                 (default=`5')",
   "  Specify the length of the k-mers you want to perform the enrichment analysis\n  on.\n",
+  "  -r, --iterations=INT       Set the number of iterations for SKA.\n                                 (default=`1')",
+  "  ",
   "  -d, --file-delimiter=char  Set the delimiter used to separate the values in\n                               the output file.\n                                 (default=`,')",
   "  The output of SKA by default is in csv format, meaning the values are comma\n  delimited. By specifying this option, you can change the delimiter used to\n  separate the values. The available delimiters are: comma (,), tab ('t'),\n  colon (:), vertical bar (|), and space (\" \") For example, setting\n  `--file-delimiter=\" \"' will change the delimiter to be space separated.\n  Support for other delimiters is currently unavailable.\n",
   "\nAlgorithms:",
   "  Select additional algorithms to determine the calculations.\n\n",
   "  -p, --independent-probs    Calculate the enrichments without the input reads.\n                                 (default=off)",
   "  Detailed description.\n",
+  "  -j, --jobs[=number]        Separate the files into separate jobs and start\n                               processing them in parallel using multiple\n                               threads.\n                                 (default=`0')",
     0
 };
 
@@ -69,13 +72,15 @@ init_help_array(void)
   SKA_args_info_help[8] = SKA_args_info_detailed_help[11];
   SKA_args_info_help[9] = SKA_args_info_detailed_help[13];
   SKA_args_info_help[10] = SKA_args_info_detailed_help[15];
-  SKA_args_info_help[11] = SKA_args_info_detailed_help[16];
-  SKA_args_info_help[12] = SKA_args_info_detailed_help[17];
-  SKA_args_info_help[13] = 0; 
+  SKA_args_info_help[11] = SKA_args_info_detailed_help[17];
+  SKA_args_info_help[12] = SKA_args_info_detailed_help[18];
+  SKA_args_info_help[13] = SKA_args_info_detailed_help[19];
+  SKA_args_info_help[14] = SKA_args_info_detailed_help[21];
+  SKA_args_info_help[15] = 0; 
   
 }
 
-const char *SKA_args_info_help[14];
+const char *SKA_args_info_help[16];
 
 typedef enum {ARG_NO
   , ARG_FLAG
@@ -106,8 +111,10 @@ void clear_given (struct SKA_args_info *args_info)
   args_info->bound_given = 0 ;
   args_info->output_given = 0 ;
   args_info->kmer_given = 0 ;
+  args_info->iterations_given = 0 ;
   args_info->file_delimiter_given = 0 ;
   args_info->independent_probs_given = 0 ;
+  args_info->jobs_given = 0 ;
 }
 
 static
@@ -122,9 +129,13 @@ void clear_args (struct SKA_args_info *args_info)
   args_info->output_orig = NULL;
   args_info->kmer_arg = 5;
   args_info->kmer_orig = NULL;
+  args_info->iterations_arg = 1;
+  args_info->iterations_orig = NULL;
   args_info->file_delimiter_arg = gengetopt_strdup (",");
   args_info->file_delimiter_orig = NULL;
   args_info->independent_probs_flag = 0;
+  args_info->jobs_arg = 0;
+  args_info->jobs_orig = NULL;
   
 }
 
@@ -140,8 +151,10 @@ void init_args_info(struct SKA_args_info *args_info)
   args_info->bound_help = SKA_args_info_detailed_help[7] ;
   args_info->output_help = SKA_args_info_detailed_help[9] ;
   args_info->kmer_help = SKA_args_info_detailed_help[11] ;
-  args_info->file_delimiter_help = SKA_args_info_detailed_help[13] ;
-  args_info->independent_probs_help = SKA_args_info_detailed_help[17] ;
+  args_info->iterations_help = SKA_args_info_detailed_help[13] ;
+  args_info->file_delimiter_help = SKA_args_info_detailed_help[15] ;
+  args_info->independent_probs_help = SKA_args_info_detailed_help[19] ;
+  args_info->jobs_help = SKA_args_info_detailed_help[21] ;
   
 }
 
@@ -250,8 +263,10 @@ SKA_cmdline_parser_release (struct SKA_args_info *args_info)
   free_string_field (&(args_info->output_arg));
   free_string_field (&(args_info->output_orig));
   free_string_field (&(args_info->kmer_orig));
+  free_string_field (&(args_info->iterations_orig));
   free_string_field (&(args_info->file_delimiter_arg));
   free_string_field (&(args_info->file_delimiter_orig));
+  free_string_field (&(args_info->jobs_orig));
   
   
   for (i = 0; i < args_info->inputs_num; ++i)
@@ -301,10 +316,14 @@ SKA_cmdline_parser_dump(FILE *outfile, struct SKA_args_info *args_info)
     write_into_file(outfile, "output", args_info->output_orig, 0);
   if (args_info->kmer_given)
     write_into_file(outfile, "kmer", args_info->kmer_orig, 0);
+  if (args_info->iterations_given)
+    write_into_file(outfile, "iterations", args_info->iterations_orig, 0);
   if (args_info->file_delimiter_given)
     write_into_file(outfile, "file-delimiter", args_info->file_delimiter_orig, 0);
   if (args_info->independent_probs_given)
     write_into_file(outfile, "independent-probs", 0, 0 );
+  if (args_info->jobs_given)
+    write_into_file(outfile, "jobs", args_info->jobs_orig, 0);
   
 
   i = EXIT_SUCCESS;
@@ -1169,8 +1188,10 @@ SKA_cmdline_parser_internal (
         { "bound",	1, NULL, 'b' },
         { "output",	1, NULL, 'o' },
         { "kmer",	1, NULL, 'k' },
+        { "iterations",	1, NULL, 'r' },
         { "file-delimiter",	1, NULL, 'd' },
         { "independent-probs",	0, NULL, 'p' },
+        { "jobs",	2, NULL, 'j' },
         { 0,  0, 0, 0 }
       };
 
@@ -1179,7 +1200,7 @@ SKA_cmdline_parser_internal (
       custom_opterr = opterr;
       custom_optopt = optopt;
 
-      c = custom_getopt_long (argc, argv, "hVi:b:o:k:d:p", long_options, &option_index);
+      c = custom_getopt_long (argc, argv, "hVi:b:o:k:r:d:pj::", long_options, &option_index);
 
       optarg = custom_optarg;
       optind = custom_optind;
@@ -1252,6 +1273,19 @@ SKA_cmdline_parser_internal (
             goto failure;
         
           break;
+        case 'r':	/* Set the number of iterations for SKA.
+.  */
+        
+        
+          if (update_arg( (void *)&(args_info->iterations_arg), 
+               &(args_info->iterations_orig), &(args_info->iterations_given),
+              &(local_args_info.iterations_given), optarg, 0, "1", ARG_INT,
+              check_ambiguity, override, 0, 0,
+              "iterations", 'r',
+              additional_error))
+            goto failure;
+        
+          break;
         case 'd':	/* Set the delimiter used to separate the values in the output file.
 .  */
         
@@ -1272,6 +1306,19 @@ SKA_cmdline_parser_internal (
           if (update_arg((void *)&(args_info->independent_probs_flag), 0, &(args_info->independent_probs_given),
               &(local_args_info.independent_probs_given), optarg, 0, 0, ARG_FLAG,
               check_ambiguity, override, 1, 0, "independent-probs", 'p',
+              additional_error))
+            goto failure;
+        
+          break;
+        case 'j':	/* Separate the files into separate jobs and start processing them in parallel using multiple threads.
+.  */
+        
+        
+          if (update_arg( (void *)&(args_info->jobs_arg), 
+               &(args_info->jobs_orig), &(args_info->jobs_given),
+              &(local_args_info.jobs_given), optarg, 0, "0", ARG_INT,
+              check_ambiguity, override, 0, 0,
+              "jobs", 'j',
               additional_error))
             goto failure;
         

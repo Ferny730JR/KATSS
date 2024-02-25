@@ -64,6 +64,12 @@ struct SKA_args_info
  original value given at command line.  */
   const char *kmer_help; /**< @brief Set the length of k-mers.
  help description.  */
+  int iterations_arg;	/**< @brief Set the number of iterations for SKA.
+ (default='1').  */
+  char * iterations_orig;	/**< @brief Set the number of iterations for SKA.
+ original value given at command line.  */
+  const char *iterations_help; /**< @brief Set the number of iterations for SKA.
+ help description.  */
   char * file_delimiter_arg;	/**< @brief Set the delimiter used to separate the values in the output file.
  (default=',').  */
   char * file_delimiter_orig;	/**< @brief Set the delimiter used to separate the values in the output file.
@@ -74,6 +80,12 @@ struct SKA_args_info
  (default=off).  */
   const char *independent_probs_help; /**< @brief Calculate the enrichments without the input reads.
  help description.  */
+  int jobs_arg;	/**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
+ (default='0').  */
+  char * jobs_orig;	/**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
+ original value given at command line.  */
+  const char *jobs_help; /**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
+ help description.  */
   
   unsigned int help_given ;	/**< @brief Whether help was given.  */
   unsigned int detailed_help_given ;	/**< @brief Whether detailed-help was given.  */
@@ -82,8 +94,10 @@ struct SKA_args_info
   unsigned int bound_given ;	/**< @brief Whether bound was given.  */
   unsigned int output_given ;	/**< @brief Whether output was given.  */
   unsigned int kmer_given ;	/**< @brief Whether kmer was given.  */
+  unsigned int iterations_given ;	/**< @brief Whether iterations was given.  */
   unsigned int file_delimiter_given ;	/**< @brief Whether file-delimiter was given.  */
   unsigned int independent_probs_given ;	/**< @brief Whether independent-probs was given.  */
+  unsigned int jobs_given ;	/**< @brief Whether jobs was given.  */
 
   char **inputs ; /**< @brief unnamed options (options without names) */
   unsigned inputs_num ; /**< @brief unnamed options number */
