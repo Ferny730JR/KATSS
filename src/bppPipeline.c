@@ -4,6 +4,7 @@
 #include <math.h>
 #include <unistd.h>
 
+#include "rna_file_parser.h"
 #include "kmerHashTable.h"
 #include "string_utils.h"
 #include "utils.h"
@@ -70,7 +71,10 @@ kmerHashTable *bpp_kmer_frequency(char *filename,
                                   int folds_provided);
 
 
-void process_line(record_data *record);
+void process_record(record_data *record, int folds_provided);
+
+
+void process_seq(record_data *record);
 
 
 int process_line_with_bpp(char          *line, 
@@ -96,9 +100,6 @@ void stream_folds(char *sequence, float *positional_probabilities, options *opt)
 
 
 char delimiter_to_char(char *user_delimiter);
-
-
-void line_w_bpp_error_handling(int error, char *filename);
 
 
 void init_default_options(options *opt) {
@@ -296,15 +297,17 @@ float* getPositionalProbabilities(char *sequence) {
 kmerHashTable *bpp_kmer_frequency(char *filename, options *opt, int folds_provided) {
     record_data     *record;
     kmerHashTable   *counts_table;
-    FILE            *read_file;
+    RNA_FILE        *read_file;
+    char            *sequence;
 
     counts_table = init_bpp_table(opt->kmer);
-    read_file = fopen(filename, "r");
+    read_file = rnaf_open(filename);
 
     record = s_malloc(sizeof *record);
     record->counts_table = counts_table;
     record->opt = opt;
 
+    /* Create folds file to write to */
     if(opt->keepFolds) {
         char *filename_prefix = basename_prefix(filename);
         char *folds_filename = concat(filename_prefix, ".folds");
@@ -315,26 +318,28 @@ kmerHashTable *bpp_kmer_frequency(char *filename, options *opt, int folds_provid
     }
 
     /* Main loop to process each line in file */
-    char buffer[1000];
-    while (fgets(buffer, sizeof(buffer), read_file)) {
-        seq_to_RNA(buffer);
-        str_to_upper(buffer);
-        remove_escapes(buffer);
-        
-        record->sequence = buffer;
+    while (1) {
+        sequence = rnaf_get(read_file);
 
-        if(folds_provided) {
-            int error = process_line_with_bpp(buffer, counts_table, opt->kmer);
-            line_w_bpp_error_handling(error, filename);
-        } else if(opt->seq_windows) {
-            WAIT_FOR_FREE_SLOT((2 * opt->jobs) -1 );
-            RUN_IN_PARALLEL(process_windows, copy_record_data(record));
-        } else {
-            WAIT_FOR_FREE_SLOT((2 * opt->jobs) - 1);
-            RUN_IN_PARALLEL(process_line, copy_record_data(record));
+        if(sequence == NULL) {
+            break;  /* Reached EOF */
         }
+
+        /* Pre-processing on sequence */
+        seq_to_RNA(sequence);
+        str_to_upper(sequence);
+        remove_escapes(sequence);
+        
+        record->sequence = sequence;
+
+        /* Function that will determine how to process the record */
+        process_record(record, folds_provided);
+
+        free(record->sequence);
     }
-    fclose(read_file);
+
+    /* Clean up*/
+    rnaf_close(read_file);
     free(record);
     WAIT_FOR_THPOOL
 
@@ -342,13 +347,39 @@ kmerHashTable *bpp_kmer_frequency(char *filename, options *opt, int folds_provid
         fclose(opt->folds_file);
     }
     
+    /* Calculate the %frequencies */
     getFrequencies(counts_table);
 
     return counts_table;
 }
 
 
-void process_line(record_data *record) {
+void process_record(record_data *record, int folds_provided) {
+    /* If folds file from --keepFolds was provided, then process line using bpp values*/
+    if(folds_provided) {
+        process_line_with_bpp(record->sequence, record->counts_table, record->opt->kmer);
+    
+    /* If --seq-windows was provided, use the sliding window algorithm for calculations */
+    } else if(record->opt->seq_windows) {
+        WAIT_FOR_FREE_SLOT((2 * record->opt->jobs) - 1 );
+        RUN_IN_PARALLEL(process_windows, copy_record_data(record));
+
+    /* Default algorithm for getting BPP frequencies */
+    } else {
+        WAIT_FOR_FREE_SLOT((2 * record->opt->jobs) - 1);
+        RUN_IN_PARALLEL(process_seq, copy_record_data(record));
+    }
+
+    /* ...if more algorithms to process the record are added, add them here. */
+}
+
+/*
+    Algorithms
+    The following functions are responsible for the actual computations of counting,
+      frequencies, and enrichment.
+*/
+
+void process_seq(record_data *record) {
     options *opt = record->opt;
     char    *sequence = record->sequence;
 
@@ -399,7 +430,8 @@ int process_line_with_bpp(char *line, kmerHashTable *counts_table, int kmer) {
     int token_count = 0;
     for(int i = 0; i<num_kmers_in_seq; i++) {
         if(data == NULL) {
-            return 1;   // segmentation fault: still in loop but data is null
+            error_message("File is formatted incorrectly.\nMake sure you are using the '.folds' file produced when running the pipeline with the '--keepFolds' command.");
+            exit(EXIT_FAILURE);
         }
 
         bpp = atof(data);
@@ -631,18 +663,6 @@ char delimiter_to_char(char *user_delimiter) {
     }
 
     return delimiter;
-}
-
-
-void line_w_bpp_error_handling(int error, char* filename) {
-    switch(error) {
-        case 0:
-            return;
-            break;
-        case 1:
-            error_message("File '%s' is formatted incorrectly.\nMake sure you are using the '.folds' file produced when running the pipeline with the '--keepFolds' command.",filename);
-            exit(EXIT_FAILURE);
-    }
 }
 
 
