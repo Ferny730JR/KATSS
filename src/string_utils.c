@@ -19,6 +19,7 @@ char* substr(char *sequence, int start, int length) {
 
     if(!sequence) {
         error_message("Unable to read string %s",sequence);
+        return NULL;
     }
     
     if(length > substr_max_length) {
@@ -60,7 +61,7 @@ char *basename_prefix(char *file_path) {
 char *concat(const char *s1, const char *s2) {
     const size_t len1 = strlen(s1);
     const size_t len2 = strlen(s2);
-    char *result = malloc(len1 + len2 + 1); // +1 for the null-terminator
+    char *result = s_malloc(len1 + len2 + 1); // +1 for the null-terminator
     if(!result) {
         error_message("Failed to allocate memory for concatenation of '%s' and '%s'.",s1,s2);
     }
@@ -68,6 +69,16 @@ char *concat(const char *s1, const char *s2) {
     memcpy(result, s1, len1);
     memcpy(result + len1, s2, len2 + 1); // +1 to copy the null-terminator
     return result;
+}
+
+
+void append(char **s1, const char *s2) {
+    const size_t len1 = *s1 ? strlen(*s1) : 0;
+    const size_t len2 =  s2 ? strlen(s2)  : 0;
+
+    *s1 = realloc(*s1,len1 + len2 + 1);
+
+    strcat(*s1, s2);
 }
 
 
