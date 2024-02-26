@@ -34,15 +34,6 @@ char* substr(char *sequence, int start, int length) {
 }
 
 
-char *prefix_of_str(char *str) {
-    char *prefix;
-
-    prefix = strtok(str, ".");
-
-    return strdup(prefix);
-}
-
-
 char *basename_prefix(char *file_path) {
     char *basename = strrchr(file_path, '/');
     basename++; // Move pointer to remove trailing '/'

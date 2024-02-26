@@ -22,12 +22,6 @@ char *substr(char *sequence, int start, int length);
 
 
 /**
- *  @brief Return basename of string containing filepath.
-*/
-char *prefix_of_str(char* str);
-
-
-/**
  *  @brief Get the basename prefix of a file path.
  * 
  *  This function removes all characters before the last occurrence of the character '/', and all
