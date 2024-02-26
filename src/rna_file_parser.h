@@ -1,5 +1,5 @@
-#ifndef FILE_PARSER
-#define FILE_PARSER
+#ifndef RNA_FILE_PARSER
+#define RNA_FILE_PARSER
 
 #include <stdio.h>
 
