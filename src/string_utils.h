@@ -24,12 +24,12 @@ char *substr(const char *sequence, const int start, const int length);
 /**
  *  @brief Get the basename prefix of a file path.
  * 
- *  This function removes all characters before the last occurrence of the character '/', and all
- *  characters following the first '.'. Assuming the full_path were to be: '/usr/bin/file.txt', 
- *  this function would return the string 'file'. If the string were to contain no '/' or '.'
- *  characters, then it returns a copy of the string as is.
+ *  This function removes all characters before the last occurrence of the character `/`, and all
+ *  characters following the first `'.'`. Assuming `full_path` were to be: `/usr/bin/file.txt`, 
+ *  this function would return the string `file`. If the string were to contain no `/` or `.`
+ *  characters, then it returns a duplicate of the string.
  * 
- *  @attention You have to free the string. Since memory is allocated to store the string, 
+ *  @note You have to free the returned string. Since memory is allocated to store the string, 
  *  it is then your responsibility to free the memory when it is no longer in use.
  * 
  *  @param full_path    The character pointer containing the file path.
@@ -45,11 +45,11 @@ char *basename_prefix(const char *full_path);
  *  The original strings passed in the argument will remain unaffected, since a new string
  *  containing the combined contents will be returned. 
  * 
- *  @attention You have to free the new string. Since memory is allocated to store the new string, 
+ *  @note You have to free the returned string. Since memory is allocated to store the new string,
  *  it is then your responsibility to free the memory when it is no longer in use.
  * 
  *  @param s1   String to concatenate to
- *  @param s2   Appends string to s1
+ *  @param s2   Appends string to `s1`
  * 
  *  @return char pointer to concatenated string.
 */
@@ -60,13 +60,27 @@ char *concat(const char *s1, const char *s2);
  *  @brief Appends the contents of the second string to the end of the first string.
  * 
  *  The function allocates memory for the combined result and updates the first string accordingly.
- *  If the first string is null or empty, it essentially duplicates the contents of s2 into s1.
- *  Similarly, if s2 is null or empty, then the contents of s1 will remain the same.
+ *  If the first string is null or empty, it essentially duplicates the contents of `s2` into `s1`.
+ *  Similarly, if `s2` is null or empty, then the contents of `s1` will remain the same.
  *
  *  @param s1 The pointer to the first string (modifiable).
  *  @param s2 The second string to append.
  */
 void append(char **s1, const char *s2);
+
+
+/**
+ *  @brief Finds the starting index of the first occurrence of a substring in a given string.
+ *
+ *  This function searches for the first occurrence of the substring specified by `s2` within
+ *  the string `s1` and returns the starting index of that occurrence. If the substring is not
+ *  found, the function returns -1.
+ *
+ *  @param s1 The null-terminated string in which the substring is searched.
+ *  @param s2 The null-terminated substring to be located within the string `s1`.
+ *  @return The starting index of the first occurrence of the substring, or -1 if not found.
+ */
+int subindx(const char *s1, const char *s2);
 
 
 /**
