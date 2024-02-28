@@ -18,7 +18,7 @@
  * 
  *  @return Pointer to the substring
 */
-char *substr(char *sequence, int start, int length);
+char *substr(const char *sequence, const int start, const int length);
 
 
 /**
@@ -36,7 +36,7 @@ char *substr(char *sequence, int start, int length);
  * 
  *  @return char pointer to the basename prefix
 */
-char *basename_prefix(char *full_path);
+char *basename_prefix(const char *full_path);
 
 
 /**
