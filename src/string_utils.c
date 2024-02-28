@@ -6,7 +6,7 @@
 #include "utils.h"
 #include "string_utils.h"
 
-char* substr(char *sequence, int start, int length) {
+char* substr(const char *sequence, const int start, const int length) {
     char*   substring = (char*) s_malloc((length+1)*sizeof(char));
     int     seq_length = strlen(sequence);
     int     substr_max_length = seq_length - start;
@@ -34,7 +34,7 @@ char* substr(char *sequence, int start, int length) {
 }
 
 
-char *basename_prefix(char *file_path) {
+char *basename_prefix(const char *file_path) {
     char *basename = strrchr(file_path, '/');
     basename++; // Move pointer to remove trailing '/'
 
@@ -52,6 +52,7 @@ char *basename_prefix(char *file_path) {
 char *concat(const char *s1, const char *s2) {
     const size_t len1 = strlen(s1);
     const size_t len2 = strlen(s2);
+
     char *result = s_malloc(len1 + len2 + 1); // +1 for the null-terminator
     if(!result) {
         error_message("Failed to allocate memory for concatenation of '%s' and '%s'.",s1,s2);
@@ -67,9 +68,17 @@ void append(char **s1, const char *s2) {
     const size_t len1 = *s1 ? strlen(*s1) : 0;
     const size_t len2 =  s2 ? strlen(s2)  : 0;
 
+    if(len2 == 0) {
+        return;     // s2 is NULL or empty, so dont modify contents of s1
+    }
+
     *s1 = realloc(*s1,len1 + len2 + 1);
 
-    strcat(*s1, s2);
+    if(len1 == 0) {
+        strcpy(*s1, s2);    // s1 is NULL or empty, so copy contents of s2
+    } else {
+        strcat(*s1, s2);    // append contents of s2 onto s1
+    }
 }
 
 
@@ -103,7 +112,7 @@ void seq_to_RNA(char *sequence) {
 
 void remove_escapes(char *sequence) {
 
-    int ln = strlen(sequence)-1;
+    size_t ln = strlen(sequence)-1;
 
     if (sequence[ln] == '\n') {  // remove trailing new line character
         sequence[ln] = '\0';
