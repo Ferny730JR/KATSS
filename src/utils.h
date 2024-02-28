@@ -32,13 +32,24 @@ void *s_malloc(size_t mem_size);
 
 
 /**
- * @brief Safely allocates memory and initializes it to 0
+ *  @brief Safely allocates memory and initializes it to 0
  * 
  *  @param  count       The number of elements to be initialized
  *  @param  mem_size    The size of memory to be allocated for an element in bytes
  *  @return             A pointer to the allocated memory 
 */
 void *s_calloc(size_t count, size_t mem_size);
+
+
+/**
+ *  @brief Safely reallocates memory
+ * 
+ *  @param  ptr         The pointer whose memory will be reallocated
+ *  @param  mem_size    The size of memory to be allocated for the pointer in bytes
+ * 
+ *  @return             A new pointer to the reallocated memory
+*/
+void *s_realloc(void *ptr, size_t mem_size);
 
 
 /**
