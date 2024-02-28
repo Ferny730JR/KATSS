@@ -108,6 +108,7 @@ void free_kmer_table(kmerHashTable *hash_table) {
             free_entry(hash_table->entries[i]);
         }
     }
+    pthread_mutex_destroy(&hash_table->lock);
     free(hash_table->entries);
     free(hash_table);
 }
