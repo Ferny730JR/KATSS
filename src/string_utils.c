@@ -12,7 +12,7 @@ char* substr(const char *sequence, const int start, const int length) {
     int     substr_max_length = seq_length - start;
 
     if(start < 0 || start > seq_length) {
-        warning_message("'start' value of %d not valid for sequence '%s' not valid.",start,sequence);
+        warning_message("'start' value of %d not valid for sequence '%s'.",start,sequence);
         free(substring);
         return NULL;
     }
@@ -23,6 +23,7 @@ char* substr(const char *sequence, const int start, const int length) {
     }
     
     if(length > substr_max_length) {
+        substring = s_realloc(substring, (substr_max_length+1)*sizeof(char));
         memcpy(substring, &sequence[start], substr_max_length);
         substring[substr_max_length] = '\0';
     } else {
@@ -72,13 +73,18 @@ void append(char **s1, const char *s2) {
         return;     // s2 is NULL or empty, so dont modify contents of s1
     }
 
-    *s1 = realloc(*s1,len1 + len2 + 1);
+    *s1 = s_realloc(*s1,len1 + len2 + 1);
 
     if(len1 == 0) {
         strcpy(*s1, s2);    // s1 is NULL or empty, so copy contents of s2
     } else {
         strcat(*s1, s2);    // append contents of s2 onto s1
     }
+}
+
+
+int subindx(const char *s1, const char *s2) {
+    return strstr(s1, s2) - s1;
 }
 
 
@@ -110,15 +116,19 @@ void seq_to_RNA(char *sequence) {
 }
 
 
-void remove_escapes(char *sequence) {
+void remove_escapes(char *str) {
 
-    size_t ln = strlen(sequence)-1;
+    if(!str) {  // str is NULL
+        return;
+    }
 
-    if (sequence[ln] == '\n') {  // remove trailing new line character
-        sequence[ln] = '\0';
+    size_t ln = strlen(str)-1;
+
+    if(str[ln] == '\n') {  // remove trailing new line character
+        str[ln] = '\0';
     }
     
-    while(isspace(*sequence)) {  // move pointer past white space
-        ++sequence;
+    while(isspace(*str)) {  // move pointer past white space
+        ++str;
     }
 }
