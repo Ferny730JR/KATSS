@@ -13,6 +13,7 @@ typedef struct {
     FILE *file;                     /** File pointer for the RNA file. */
     char buffer[MAX_SEQ_LENGTH];    /** Character buffer to store sequence data. */
     char *end_of_file;              /** Pointer to the end of the file indicator. */
+    char filetype;                  /** Character to store which file type was passed. */
 } RNA_FILE;
 
 
