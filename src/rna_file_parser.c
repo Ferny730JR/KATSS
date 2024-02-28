@@ -26,6 +26,7 @@ int is_full(char *buffer, int buffer_size);
 RNA_FILE *rnaf_open(char* filename) {
     RNA_FILE *rna_file = s_malloc(sizeof *rna_file);
     rna_file->file = fopen(filename, "r");
+    memset(rna_file->buffer, 0, sizeof(char)*MAX_SEQ_LENGTH); // init buffer to '\0'
 
     /* Check if we can open file for reading */
     if( (rna_file->file) == NULL ) {
@@ -61,7 +62,8 @@ char *rnaf_get(RNA_FILE *rna_file) {
         parse_reads(rna_file, &seq);
 
     } else {
-        warning_message("Unable to read sequence from file.\nCurrent supported file types are: FASTA, FASTQ, and files containing sequences per line.");
+        warning_message("Unable to read sequence from file.\nCurrent supported file types are:"
+        "FASTA, FASTQ, and files containing sequences per line.");
     }
 
     return seq;
@@ -146,6 +148,8 @@ void parse_reads(RNA_FILE *rna_file, char **ret_seq) {
     if(rna_file->end_of_file) {
         *ret_seq = seq;
         rna_file->end_of_file = fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file);
+    } else {
+        free(seq);
     }
 }
 
