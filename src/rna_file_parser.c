@@ -14,6 +14,8 @@ void parse_fastq(RNA_FILE *rna_file, char **ret_seq);
 
 void parse_reads(RNA_FILE *rna_file, char **ret_seq);
 
+char determine_filetype(char peek);
+
 int is_nucleotide(char character);
 
 int is_full(char *buffer, int buffer_size);
@@ -44,6 +46,9 @@ RNA_FILE *rnaf_open(char* filename) {
         return NULL;
     }
 
+    /* Determine what type of file was passed */
+    rna_file->filetype = determine_filetype(rna_file->buffer[0]);
+
     return rna_file;
 }
 
@@ -52,18 +57,14 @@ char *rnaf_get(RNA_FILE *rna_file) {
     char *seq = NULL;
     
     /* Check the type of file format */
-    if(rna_file->buffer[0] == '>') {    // fasta file
-        parse_fasta(rna_file, &seq);
-
-    } else if(rna_file->buffer[0] == '@') { // fastq file
-        parse_fastq(rna_file, &seq);
-
-    } else if( is_nucleotide(rna_file->buffer[0]) ) {   // pure reads file
-        parse_reads(rna_file, &seq);
-
-    } else {
-        warning_message("Unable to read sequence from file.\nCurrent supported file types are:"
-        "FASTA, FASTQ, and files containing sequences per line.");
+    switch(rna_file->filetype) {
+        case 'a':   parse_fasta(rna_file, &seq);    break;
+        case 'q':   parse_fastq(rna_file, &seq);    break;
+        case 'r':   parse_reads(rna_file, &seq);    break;
+        default:
+            error_message("Unable to read sequence from file.\nCurrent supported file types are:"
+            " FASTA, FASTQ, and files containing sequences per line.");
+            break;
     }
 
     return seq;
@@ -83,15 +84,11 @@ void rnaf_close(RNA_FILE *rna_file) {
 void parse_fasta(RNA_FILE *rna_file, char **ret_seq) {
     char    *seq;
 
-    /* using 'seq = NULL' results in seg fault from append because of strlen. */
-    seq = s_malloc(0); /* Init seq, will be realloc'd based on input stream */
+    /* Init seq, will be realloc'd based on input stream */
+    seq = NULL;
     while (fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file)) { 
         if (rna_file->buffer[0] == '>') {
             break;      /* New sequence, so break */
-        }
-
-        if( !is_nucleotide(rna_file->buffer[0]) ) {
-            continue;   /* Still reading from metadata, so skip iteration */
         }
 
         /* Append sequence found in buffer into seq variable */
@@ -99,7 +96,7 @@ void parse_fasta(RNA_FILE *rna_file, char **ret_seq) {
     }
 
     /* Have ret_seq point to new seq */
-    *ret_seq  = seq;
+    *ret_seq = seq;
 }
 
 
@@ -107,14 +104,14 @@ void parse_fastq(RNA_FILE *rna_file, char **ret_seq) {
     char            *seq;
     unsigned int    reading_seq = 1;
 
-    /* using 'seq = NULL' results in seg fault from append because of strlen. */
-    seq = s_malloc(0); /* Init seq, will be realloc'd based on input stream */
+    /* Init seq, will be realloc'd based on input stream */
+    seq = NULL;
     while(fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file)) {
         if(rna_file->buffer[0] == '@' ) {
             break;  /* New sequence, so break */
         }
 
-        if ( !is_nucleotide(rna_file->buffer[0]) ) {
+        if ( rna_file->buffer[0] == '+' ) {
             reading_seq = 0;
             continue;   /* Reading from metadata, so skip iteration */
         }
@@ -133,7 +130,6 @@ void parse_fastq(RNA_FILE *rna_file, char **ret_seq) {
 void parse_reads(RNA_FILE *rna_file, char **ret_seq) {
     char    *seq;
 
-    /* using 'seq = NULL' results in seg fault from append because of strlen. */
     seq = NULL;
     append(&seq, rna_file->buffer);
 
@@ -149,8 +145,25 @@ void parse_reads(RNA_FILE *rna_file, char **ret_seq) {
         *ret_seq = seq;
         rna_file->end_of_file = fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file);
     } else {
-        free(seq);
+        free(seq);  /* EOF, so free seq */
     }
+}
+
+
+char determine_filetype(char peek) {
+    char ret;
+
+    if( is_nucleotide(peek) ) {
+        ret = 'r';  /* reads file */
+    } else if(peek == '@') {
+        ret = 'q';  /* fastq file */
+    } else if(peek == '>') {
+        ret = 'a';  /* fasta file */
+    } else {
+        ret = '\0'; /* unsupported file type */
+    }
+
+    return ret;
 }
 
 
