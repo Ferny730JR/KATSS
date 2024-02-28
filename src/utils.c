@@ -64,3 +64,14 @@ void *s_calloc(size_t count, size_t mem_size) {
 
     return pointer;
 }
+
+
+void *s_realloc(void *ptr, size_t mem_size) {
+    void *new_ptr = realloc(ptr, mem_size);
+    if(new_ptr == NULL) {
+        error_message("Failed to reallocate memory");
+        exit(EXIT_FAILURE);
+    }
+
+    return new_ptr;
+}
