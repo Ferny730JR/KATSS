@@ -84,7 +84,23 @@ void append(char **s1, const char *s2) {
 
 
 int subindx(const char *s1, const char *s2) {
-    return strstr(s1, s2) - s1;
+    char *s = strstr(s1, s2);
+    if(s) {
+        return s - s1;
+    } else {
+        return -1;
+    }
+}
+
+
+void cross_out(char *s1, const char *s2) {
+    size_t len_s2 = strlen(s2);
+    int indx;
+    while( (indx = subindx(s1, s2)) != -1) {
+        for(size_t i=indx; i<indx+len_s2; i++) {
+            s1[i]='X';
+        }
+    }
 }
 
 
