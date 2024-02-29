@@ -8,7 +8,7 @@
  *  
  *  The start parameter defines the starting index of the sequence string
  * 
- *  @attention You have to free the substring. Since memory is allocated to store the substring, 
+ *  @note You have to free the substring. Since memory is allocated to store the substring, 
  *  it is then your responsibility to free the memory when it is no longer in use.
  * 
  * 
@@ -81,6 +81,20 @@ void append(char **s1, const char *s2);
  *  @return The starting index of the first occurrence of the substring, or -1 if not found.
  */
 int subindx(const char *s1, const char *s2);
+
+
+/**
+ *  @brief Replace every instance of `s2` in `s1` with `X`'s.
+ * 
+ *  This function searches for every occurrence of the substring `s2` within the string `s1` and
+ *  replaces every character that matches `s2` with `X`'s. For example, if `s1` were to be
+ *  `Hello wonderful world!` and `s2` were to be `wo`, then `s1` would be modified to look as such:
+ *  `Hello XXnderful XXrld!`. If `s2` is not found within `s1`, then `s1` will remain unmodified.
+ * 
+ *  @param s1 The null-terminated string which will be crossed out
+ *  @param s2 The null-termianted substring to be searched for within the string `s1`
+*/
+void cross_out(char *s1, const char *s2);
 
 
 /**
