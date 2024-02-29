@@ -3,7 +3,9 @@
 #include <string.h>
 #include <math.h>
 #include <unistd.h>
+#include <float.h>
 
+#include "rna_file_parser.h"
 #include "kmerHashTable.h"
 #include "string_utils.h"
 #include "utils.h"
@@ -11,10 +13,11 @@
 
 #include "SKA_cmdl.h"
 
-typedef struct {
+typedef struct options {
     char    *input_file;
     char    *bound_file;
-    char    *out_file;
+    char    *out_filename;
+    FILE    *out_file;
     int     out_given;
     int     kmer;
     int     iterations;
@@ -22,6 +25,9 @@ typedef struct {
 
     int     independent_probs;
     int     jobs;
+
+    char    **top_kmer;
+    int     cur_iter;
 } options;
 
 
@@ -60,10 +66,16 @@ void getFrequencies(kmerHashTable *counts_table);
 kmerHashTable *getEnrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt);
 
 
+Entry *kmer_max_entry(kmerHashTable *hash_table);
+
+
 char delimiter_to_char(char *user_delimiter);
 
 
 int compare(const void *a, const void *b);
+
+
+void entry_to_file(FILE *file, Entry *entry, char delimiter);
 
 
 void free_options(options *opt);
@@ -75,7 +87,8 @@ void print_options(options *opt);
 void init_default_options(options *opt) {
     opt->input_file     = NULL;
     opt->bound_file     = NULL;
-    opt->out_file       = "motif";
+    opt->out_filename   = "motif";
+    opt->out_file       = NULL;
     opt->out_given      = 0;
     opt->kmer           = 3;
     opt->iterations     = 1;
@@ -83,6 +96,9 @@ void init_default_options(options *opt) {
 
     opt->independent_probs  = 0;
     opt->jobs               = 0;
+
+    opt->top_kmer       = NULL;
+    opt->cur_iter       = 0;
 }
 
 
@@ -128,8 +144,8 @@ int main(int argc, char **argv) {
     }
 
     if(args_info.output_given) {
-        opt.out_given = 1;
-        opt.out_file  = strdup(args_info.output_arg);
+        opt.out_given    = 1;
+        opt.out_filename = strdup(args_info.output_arg);
     }
     
     if(args_info.kmer_given) {
@@ -165,7 +181,7 @@ int main(int argc, char **argv) {
         int thread_max = max_user_threads();
 
         if (args_info.jobs_arg == 0) {
-        /* use maximum of concurrent threads */
+            /* use maximum of concurrent threads */
             int proc_cores, proc_cores_conf;
             if (num_proc_cores(&proc_cores, &proc_cores_conf)) {
                 opt.jobs = MIN2(thread_max, proc_cores_conf);
@@ -180,66 +196,95 @@ int main(int argc, char **argv) {
         opt.jobs = MAX2(1, opt.jobs);
     }
 
+    char *filename = concat(opt.out_filename, ".dsv");
+    opt.out_file = fopen(filename, "w");
+    if (opt.out_file == NULL) {
+        error_message("Could not write to file '%s'\n",filename);
+    }
+
+    opt.top_kmer = s_malloc(opt.iterations * sizeof(char *));
+    for(size_t i=0; i<opt.iterations; i++) {
+        opt.top_kmer[i] = NULL;
+    }
+
     SKA_cmdline_parser_free(&args_info);
-    print_options(&opt);
+    free(filename);
 
     /*##########################################################
     #  Computations                                            #
     ##########################################################*/
 
-    if(opt.independent_probs) {
-        frqIndependentProbs kmer_data;
-        kmer_data = process_independent_probs(opt.bound_file, &opt);
+    while(opt.cur_iter < opt.iterations) {
+        if(opt.independent_probs) {
+            frqIndependentProbs kmer_data;
+            kmer_data = process_independent_probs(opt.bound_file, &opt);
 
-        input_table = predict_kmers(kmer_data.monomer_frq, kmer_data.dimer_frq, opt.kmer);
-        bound_table = kmer_data.kmer_frq;
-    } else {
-        input_table = count_kmers(opt.input_file, &opt);
-        bound_table = count_kmers(opt.bound_file, &opt);
-        getFrequencies(input_table);
-        getFrequencies(bound_table);
+            input_table = predict_kmers(kmer_data.monomer_frq, kmer_data.dimer_frq, opt.kmer);
+            bound_table = kmer_data.kmer_frq;
+        } else {
+            input_table = count_kmers(opt.input_file, &opt);
+            bound_table = count_kmers(opt.bound_file, &opt);
+            getFrequencies(input_table);
+            getFrequencies(bound_table);
+        }
+
+        enrichments_table = getEnrichment(input_table, bound_table, &opt);
+
+        Entry *max_entry = kmer_max_entry(enrichments_table);
+        entry_to_file(opt.out_file, max_entry, opt.file_delimiter);
+
+        opt.top_kmer[opt.cur_iter] = strdup(max_entry->key);
+        opt.cur_iter++;
+
+        /* free tables */
+        free_kmer_table(enrichments_table);
+        free_kmer_table(input_table);
+        free_kmer_table(bound_table);
     }
-
-    enrichments_table = getEnrichment(input_table, bound_table, &opt);
-
-    qsort(enrichments_table->entries, enrichments_table->capacity,
-        sizeof(*enrichments_table->entries), compare);
-    
-    kmerHashTable_to_file(enrichments_table, opt.out_file, opt.file_delimiter);
 
     /* Clean up */
     free_options(&opt);
-    free_kmer_table(input_table);
-    free_kmer_table(bound_table);
-    free_kmer_table(enrichments_table);
+
+    return 0;
 }
 
 
 kmerHashTable *count_kmers(char *filename, options *opt) {
-    FILE *read_file;
+    RNA_FILE *read_file;
     kmerHashTable *counts_table;
     record_data *record = s_malloc(sizeof *record);
 
     counts_table = init_kmer_table(opt->kmer, 1);
-    read_file    = fopen(filename, "r");
+    read_file    = rnaf_open(filename);
 
     record->counts_table = counts_table;
     record->kmer = opt->kmer;
 
-    char buffer[1024];
-    while(fgets(buffer, sizeof(buffer), read_file)) {
-        seq_to_RNA(buffer);
-        str_to_upper(buffer);
-        remove_escapes(buffer);
+    char *sequence;
+    while(1) {
+        sequence = rnaf_get(read_file);
 
-        record->sequence = buffer;
+        if(sequence == NULL) {
+            break;
+        }
+
+        seq_to_RNA(sequence);
+        str_to_upper(sequence);
+        remove_escapes(sequence);
+        for(size_t i=0; i<opt->cur_iter; i++) {
+            cross_out(sequence, opt->top_kmer[i]);
+        }
+
+        record->sequence = sequence;
+        
         process_counts(record);
     }
-    fclose(read_file);
+    rnaf_close(read_file);
     free(record);
 
     return counts_table;
 }
+
 
 void process_counts(record_data *record) {
     char *k_substr;
@@ -250,10 +295,14 @@ void process_counts(record_data *record) {
         // Get kmer substring
         k_substr = substr(record->sequence, i, record->kmer);
 
-        kmer_add_value(record->counts_table, k_substr, 1, 0);
+        if(k_substr[record->kmer-1] != 'X' && k_substr[0] != 'X') {
+            kmer_add_value(record->counts_table, k_substr, 1, 0);
+        }
 
         free(k_substr);
     }
+
+    free(record->sequence);
 }
 
 
@@ -375,10 +424,16 @@ void getFrequencies(kmerHashTable *counts_table) {
     double k_count;
 
     for(int i=0; i<counts_table->capacity; i++) {
+        if(counts_table->entries[i] == NULL) {
+            continue;
+        }
         total_count+=counts_table->entries[i]->values[0];
     }
 
     for(int i=0; i<counts_table->capacity; i++) {
+        if(counts_table->entries[i] == NULL) {
+            continue;
+        }
         k_count = counts_table->entries[i]->values[0];
         counts_table->entries[i]->values[num_columns] = k_count/total_count;
     }
@@ -419,6 +474,24 @@ kmerHashTable *getEnrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq,
 /*##########################################################
 #  Helper Functions                                        #
 ##########################################################*/
+
+Entry *kmer_max_entry(kmerHashTable *hash_table) {
+    double max_value = -DBL_MAX;
+    Entry *max_entry = NULL;
+    for(int i=0; i<hash_table->capacity; i++) {
+        if(hash_table->entries[i] == NULL) {
+            continue;
+        }
+        
+        if(hash_table->entries[i]->values[0] > max_value) {
+            max_value = hash_table->entries[i]->values[0];
+            max_entry = hash_table->entries[i];
+        }
+    }
+
+    return max_entry;
+}
+
 
 char delimiter_to_char(char *user_delimiter) {
     char delimiter;
@@ -478,6 +551,11 @@ int compare(const void *a, const void *b) {
 }
 
 
+void entry_to_file(FILE *file, Entry *entry, char delimiter) {
+    fprintf(file, "%s%c%f\n", entry->key, delimiter, entry->values[0]);
+}
+
+
 void free_options(options *opt) {
     if(opt->input_file && !opt->independent_probs) {
         free(opt->input_file);
@@ -486,15 +564,20 @@ void free_options(options *opt) {
         free(opt->bound_file);
     }
     if(opt->out_given) {
-        free(opt->out_file);
+        free(opt->out_filename);
     }
+    for(size_t i=0; i<opt->iterations; i++) {
+        free(opt->top_kmer[i]);
+    }
+    free(opt->top_kmer);
+    fclose(opt->out_file);
 }
 
 
 void print_options(options *opt) {
     printf("input_file: '%s'\n",opt->input_file);
     printf("bound_file: '%s'\n",opt->bound_file);
-    printf("output_file: '%s'\n",opt->out_file);
+    printf("output_file: '%s'\n",opt->out_filename);
     printf("kmer: '%d'\n",opt->kmer);
     printf("iterations: '%d'\n",opt->iterations);
     printf("jobs: '%d'\n",opt->jobs);
