@@ -42,13 +42,15 @@ double *kmer_get(kmerHashTable *hash_table, const char *key) {
     if (strcmp(hash_table->entries[index]->key, key) == 0) {
         return hash_table->entries[index]->values;
     }
+    error_message("Unable to get values from table.\n"
+                  "Expected key: '%s' - Actual key: '%s'",key, hash_table->entries[index]->key);
     exit(EXIT_FAILURE);
 }
 
 
 void kmer_add_value(kmerHashTable *hash_table, const char *key, double value, int value_index) {
     if(value_index >= hash_table->cols) {
-        error_message("value_index '%d' is greater than length of value array, which is %d.",
+        error_message("value_index '%d' is greater than length of value array, which is '%d'.",
         value_index, hash_table->cols);
         exit(EXIT_FAILURE);
     }
@@ -66,6 +68,9 @@ void kmer_add_value(kmerHashTable *hash_table, const char *key, double value, in
         pthread_mutex_unlock(&hash_table->lock);
         return;
     }
+
+    error_message("Unable to add value to table.\n"
+                  "Expected key: '%s' - Actual key: '%s'",key, hash_table->entries[index]->key);
     exit(EXIT_FAILURE);
 }
 
