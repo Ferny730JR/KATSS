@@ -245,9 +245,6 @@ int main(int argc, char **argv) {
 
     INIT_PARALLELIZATION(opt.jobs);
     control_table = bpp_kmer_frequency(opt.input_file, &opt, opt.input_fold);
-    UNINIT_PARALLELIZATION
-
-    INIT_PARALLELIZATION(opt.jobs);
     bounds_table  = bpp_kmer_frequency(opt.bound_file, &opt, opt.bound_fold);
     UNINIT_PARALLELIZATION
 
@@ -369,15 +366,13 @@ void process_record(record_data *record, int folds_provided) {
         WAIT_FOR_FREE_SLOT((2 * record->opt->jobs) - 1);
         RUN_IN_PARALLEL(process_seq, copy_record_data(record));
     }
-
     /* ...if more algorithms to process the record are added, add them here. */
 }
 
-/*
-    Algorithms
-    The following functions are responsible for the actual computations of counting,
-      frequencies, and enrichment.
-*/
+
+/*##########################################################
+#  Algorithms - functions responsible for computations     #
+##########################################################*/
 
 void process_seq(record_data *record) {
     options *opt = record->opt;
@@ -570,10 +565,10 @@ kmerHashTable *getBPPEnrichment(kmerHashTable *control_frq, kmerHashTable *bound
         control_values = kmer_get(control_frq, key);
 
         for(int j = 0; j < kmer; j++) {
-            if(bound_values[j] == 0.0f || control_values[j] == 0.0f) {
-                enrichment = 0.0f;
+            if(bound_values[j] == 0. || control_values[j] == 0.) {
+                enrichment = 0.;
             } else {
-                enrichment = logf(bound_values[j]/control_values[j])/logf(2.0f);
+                enrichment = log(bound_values[j]/control_values[j])/log(2.);
             }
             kmer_add_value(enrichments_table, key, enrichment, j);
         }
