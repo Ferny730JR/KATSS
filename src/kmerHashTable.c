@@ -48,7 +48,10 @@ double *kmer_get(kmerHashTable *hash_table, const char *key) {
 }
 
 
-void kmer_add_value(kmerHashTable *hash_table, const char *key, double value, int value_index) {
+void kmer_add_value(kmerHashTable   *hash_table, 
+                    const char      *key, 
+                    double          value, 
+                    unsigned int    value_index) {
     if(value_index >= hash_table->cols) {
         error_message("value_index '%d' is greater than length of value array, which is '%d'.",
         value_index, hash_table->cols);
@@ -157,7 +160,7 @@ void print_kmer_table(kmerHashTable *hash_table) {
         }
         
         printf("Key: %s, Values: ", hash_table->entries[i]->key);
-        for(int j = 0; j < hash_table->cols; j++) {
+        for(size_t j = 0; j < hash_table->cols; j++) {
             printf("%f ",hash_table->entries[i]->values[j]);
         }
         printf("\n");

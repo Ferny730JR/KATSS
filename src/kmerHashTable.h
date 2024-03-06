@@ -80,7 +80,7 @@ double *kmer_get(kmerHashTable  *hash_table,
 void kmer_add_value(kmerHashTable   *hash_table, 
                     const char      *key, 
                     double          value, 
-                    int             value_index);
+                    unsigned int    value_index);
 
 
 /**
