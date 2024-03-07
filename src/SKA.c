@@ -203,7 +203,7 @@ int main(int argc, char **argv) {
     }
 
     opt.top_kmer = s_malloc(opt.iterations * sizeof(char *));
-    for(size_t i=0; i<opt.iterations; i++) {
+    for(int i=0; i<opt.iterations; i++) {
         opt.top_kmer[i] = NULL;
     }
 
@@ -271,7 +271,7 @@ kmerHashTable *count_kmers(char *filename, options *opt) {
         seq_to_RNA(sequence);
         str_to_upper(sequence);
         remove_escapes(sequence);
-        for(size_t i=0; i<opt->cur_iter; i++) {
+        for(int i=0; i<opt->cur_iter; i++) {
             cross_out(sequence, opt->top_kmer[i]);
         }
 
@@ -344,7 +344,6 @@ frqIndependentProbs process_independent_probs(char *filename, options *opt) {
 void count_di_mono_nt(char *sequence, frqIndependentProbs kmer_data, options *opt) {
     char    *k_substr;
     int     seq_length = strlen(sequence);
-    int     num_di_nt_in_seq = seq_length - 1;
     int     num_kmers_in_seq = seq_length - opt->kmer + 1;
 
     for(int i=0; i<seq_length; i++) {
@@ -382,7 +381,7 @@ kmerHashTable *predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2me
     kmers = s_malloc(predicted_kmers->capacity * sizeof(char *));
 
     /* Produce array of strings containing all k-mers */
-    for (int i = 0; i < predicted_kmers->capacity; i++) {
+    for (unsigned long i = 0; i < predicted_kmers->capacity; i++) {
         kmers[i] = malloc((kmer + 1) * sizeof(char));
 
         int index = i;
@@ -394,7 +393,7 @@ kmerHashTable *predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2me
     }
 
     /* Get the probability of kmer being in reads */
-    for(int i = 0; i < predicted_kmers->capacity; i++) {
+    for(unsigned long i = 0; i < predicted_kmers->capacity; i++) {
         dinucleotides_prob = 1;
         monomers_probs     = 1;
         for(int j=0; j < kmer-1; j++) {
@@ -419,18 +418,18 @@ kmerHashTable *predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2me
 
 
 void getFrequencies(kmerHashTable *counts_table) {
-    int num_columns = counts_table->cols-1;
+    unsigned int num_columns = counts_table->cols-1;
     double total_count = 0;
     double k_count;
 
-    for(int i=0; i<counts_table->capacity; i++) {
+    for(unsigned long i=0; i<counts_table->capacity; i++) {
         if(counts_table->entries[i] == NULL) {
             continue;
         }
         total_count+=counts_table->entries[i]->values[0];
     }
 
-    for(int i=0; i<counts_table->capacity; i++) {
+    for(unsigned long i=0; i<counts_table->capacity; i++) {
         if(counts_table->entries[i] == NULL) {
             continue;
         }
@@ -450,7 +449,7 @@ kmerHashTable *getEnrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq,
     enrichments_table = init_kmer_table(opt->kmer, 1);
     
     // Get the log2 fold change for each kmer
-    for(size_t i = 0; i < enrichments_table->capacity; i++) {
+    for(unsigned long i = 0; i < enrichments_table->capacity; i++) {
         if(bound_frq->entries[i] == NULL || input_frq->entries[i] == NULL) {
             continue;
         }
@@ -478,7 +477,7 @@ kmerHashTable *getEnrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq,
 Entry *kmer_max_entry(kmerHashTable *hash_table) {
     double max_value = -DBL_MAX;
     Entry *max_entry = NULL;
-    for(int i=0; i<hash_table->capacity; i++) {
+    for(unsigned long i=0; i<hash_table->capacity; i++) {
         if(hash_table->entries[i] == NULL) {
             continue;
         }
@@ -566,7 +565,7 @@ void free_options(options *opt) {
     if(opt->out_given) {
         free(opt->out_filename);
     }
-    for(size_t i=0; i<opt->iterations; i++) {
+    for(int i=0; i<opt->iterations; i++) {
         free(opt->top_kmer[i]);
     }
     free(opt->top_kmer);
