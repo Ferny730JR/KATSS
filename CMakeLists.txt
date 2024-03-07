@@ -1,11 +1,10 @@
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.7.1)
 project(KASS
     VERSION 1.0
     DESCRIPTION "A suite of tools for k-mer analysis of RNA sequence and structure.")
 
 # Output binaries into build directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
-set(CMAKE_INSTALL_PREFIX /usr/local/bin)
 
 # Build bppPipeline
 add_executable(bppPipeline
@@ -52,7 +51,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(bppPipeline PRIVATE -Wall -flto -fopenmp -O3 -lm -lstdc++)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin") # Apple
     target_compile_options(SKA PRIVATE -Wall -Wextra -Wpedantic -flto -O3)
-    target_compile_options(bppPipeline -Wall -Wextra -Wpedantic PRIVATE -flto -O3)
+    target_compile_options(bppPipeline PRIVATE -Wall -flto -O3)
 else()
     message( SEND_ERROR "System ${CMAKE_SYSTEM_NAME} currently not supported.")
 endif()
@@ -65,6 +64,11 @@ if(LIBRARY_LRNA)
     target_link_libraries(bppPipeline PUBLIC ${LIBRARY_LRNA})
 else()
     message( SEND_ERROR "Couldn't find libRNA")
+endif()
+
+# Install files
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX /usr/local/bin)
 endif()
 
 install(TARGETS SKA bppPipeline
