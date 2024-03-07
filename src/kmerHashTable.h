@@ -18,9 +18,9 @@ typedef struct {
  *  @brief Hash table data structure to store kmer's and associated information.
 */
 typedef struct {
-    size_t  capacity;
-    size_t  cols;
-    Entry   **entries;
+    unsigned long   capacity;
+    unsigned int    cols;
+    Entry           **entries;
     pthread_mutex_t lock;
 } kmerHashTable;
 
@@ -40,7 +40,7 @@ typedef struct {
  * 
  *  @return Pointer to the initialized kmerHashTable
 */
-kmerHashTable *init_kmer_table(int kmer, int cols);
+kmerHashTable *init_kmer_table(unsigned int kmer, unsigned int cols);
 
 
 /**
@@ -48,7 +48,7 @@ kmerHashTable *init_kmer_table(int kmer, int cols);
  * 
  *  @return Pointer to the initialized kmerHashTable
 */
-kmerHashTable *init_bpp_table(int kmer);
+kmerHashTable *init_bpp_table(unsigned int kmer);
 
 
 /**

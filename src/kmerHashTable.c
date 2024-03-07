@@ -7,16 +7,16 @@
 #include "utils.h"
 #include "string_utils.h"
 
-Entry *create_entry(const char  *key, 
-                    int         col);
+Entry *create_entry(const char   *key, 
+                    unsigned int  col);
 
-unsigned int hash(const char    *key);
+unsigned int hash(const char *key);
 
 void free_entry(Entry *entry);
 
 
-kmerHashTable *init_kmer_table(int kmer, int cols) {
-    size_t table_size = 1 << (2 * kmer); // 4^kmer
+kmerHashTable *init_kmer_table(unsigned int kmer, unsigned int cols) {
+    unsigned long table_size = 1 << (2 * kmer); // 4^kmer
     kmerHashTable *hash_table = s_malloc(sizeof *hash_table);
 
     hash_table->capacity = table_size;
@@ -24,7 +24,7 @@ kmerHashTable *init_kmer_table(int kmer, int cols) {
     hash_table->entries = s_malloc(table_size * sizeof(Entry*));
     pthread_mutex_init(&hash_table->lock, NULL);
 
-    for (size_t i = 0; i < table_size; i++) {
+    for (unsigned long i = 0; i < table_size; i++) {
         hash_table->entries[i] = NULL;
     }
 
@@ -32,7 +32,7 @@ kmerHashTable *init_kmer_table(int kmer, int cols) {
 }
 
 
-kmerHashTable *init_bpp_table(int kmer) {
+kmerHashTable *init_bpp_table(unsigned int kmer) {
     return init_kmer_table(kmer, kmer+1);
 }
 
@@ -78,7 +78,7 @@ void kmer_add_value(kmerHashTable   *hash_table,
 }
 
 
-Entry *create_entry(const char *key, int col) {
+Entry *create_entry(const char *key, unsigned int col) {
     Entry *entry = s_malloc(sizeof *entry);
     entry->key = strdup(key);
     entry->values = s_calloc(col, sizeof(double));
@@ -123,13 +123,13 @@ void free_kmer_table(kmerHashTable *hash_table) {
 
 
 void print_table_to_file(kmerHashTable *table, FILE *table_file, char sep) {
-    for(size_t i = 0; i < table->capacity; i++) {
+    for(unsigned long i = 0; i < table->capacity; i++) {
         if(table->entries[i] == NULL) {
             continue;
         }
 
         fprintf(table_file, "%s", table->entries[i]->key);
-        for(size_t j = 0; j < table->cols; j++) {
+        for(unsigned long j = 0; j < table->cols; j++) {
             fprintf(table_file, "%c%9.6f", sep, table->entries[i]->values[j]);
         }
         fprintf(table_file,"\n");
@@ -154,13 +154,13 @@ void kmerHashTable_to_file(kmerHashTable *table, char *name, char file_delimiter
 
 void print_kmer_table(kmerHashTable *hash_table) {
     printf("--- BEGIN KMER TABLE ---\n");
-    for(size_t i = 0; i < hash_table->capacity; i++) {
+    for(unsigned long i = 0; i < hash_table->capacity; i++) {
         if(hash_table->entries[i] == NULL) {
             continue;
         }
         
         printf("Key: %s, Values: ", hash_table->entries[i]->key);
-        for(size_t j = 0; j < hash_table->cols; j++) {
+        for(unsigned long j = 0; j < hash_table->cols; j++) {
             printf("%f ",hash_table->entries[i]->values[j]);
         }
         printf("\n");
