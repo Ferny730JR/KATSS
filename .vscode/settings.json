@@ -13,5 +13,7 @@
         "fold.h": "c"
     },
     "editor.wordWrap": "wordWrapColumn",
-    "editor.wordWrapColumn": 99
+    "editor.wordWrapColumn": 99,
+    "editor.insertSpaces": false,
+    "editor.detectIndentation": false
 }
