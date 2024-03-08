@@ -25,12 +25,13 @@ free_kcounter(KmerCounter *kmer_counter)
 }
 
 
-unsigned int 
+long
 kctr_hash(const char *key, int start, int length) 
 {
 	unsigned int hash_value = 0;
 	for(int i=start; i<start+length; i++) {
 		switch(key[i]) {
+			case 'X': return -1;
 			case 'A': hash_value = hash_value * 4;     break;
 			case 'C': hash_value = hash_value * 4 + 1; break;
 			case 'G': hash_value = hash_value * 4 + 2; break;
@@ -60,7 +61,7 @@ kctr_unhash(unsigned int hash_value, int length)
             case 0: key[i] = 'A'; break;
             case 1: key[i] = 'C'; break;
             case 2: key[i] = 'G'; break;
-            case 3: key[i] = 'T'; break; // Assuming 'T' for the default case
+            case 3: key[i] = 'U'; break; // Assuming 'T' for the default case
         }
         hash_value /= 4;
     }
@@ -74,9 +75,12 @@ kctr_increment(KmerCounter *kcounter, char *sequence)
 {
     int num_kmers_in_seq = strlen(sequence) - kcounter->k_mer + 1;
 
-    unsigned int index;
+    long index;
     for(int i=0; i<num_kmers_in_seq; i++) {
         index = kctr_hash(sequence,i,kcounter->k_mer);
+		if(index == -1) {
+			continue;
+		}
         kcounter->entries[index]++;
     }
 }
