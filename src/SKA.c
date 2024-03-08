@@ -6,6 +6,7 @@
 #include <float.h>
 
 #include "rna_file_parser.h"
+#include "kmer_counter.h"
 #include "kmerHashTable.h"
 #include "string_utils.h"
 #include "utils.h"
@@ -38,20 +39,10 @@ typedef struct {
 } frqIndependentProbs;
 
 
-typedef struct {
-    kmerHashTable   *counts_table;
-    char            *sequence;
-    int             kmer;
-} record_data;
-
-
 void process_iteration(options *opt);
 
 
 kmerHashTable *count_kmers(char *filename, options *opt);
-
-
-void process_counts(record_data *record);
 
 
 frqIndependentProbs process_independent_probs(char *filename, options *opt);
@@ -263,13 +254,11 @@ void process_iteration(options *opt) {
 kmerHashTable *count_kmers(char *filename, options *opt) {
     RNA_FILE *read_file;
     kmerHashTable *counts_table;
-    record_data *record = s_malloc(sizeof *record);
+	KmerCounter *counter;
 
     counts_table = init_kmer_table(opt->kmer, 1);
-    read_file    = rnaf_open(filename);
-
-    record->counts_table = counts_table;
-    record->kmer = opt->kmer;
+    read_file	 = rnaf_open(filename);
+	counter		 = init_kcounter(opt->kmer);
 
     char *sequence;
     while(1) {
@@ -286,34 +275,19 @@ kmerHashTable *count_kmers(char *filename, options *opt) {
             cross_out(sequence, opt->top_kmer[i]);
         }
 
-        record->sequence = sequence;
-        
-        process_counts(record);
+		kctr_increment(counter, sequence);
+		free(sequence);
     }
     rnaf_close(read_file);
-    free(record);
+
+	counts_table = init_kmer_table(opt->kmer, 1);
+	for(unsigned int i=0; i<counter->capacity; i++) {
+		sequence = kctr_get_key(counter, i);
+		kmer_add_value(counts_table, sequence, kctr_get(counter, sequence), 0);
+		free(sequence);
+	}
 
     return counts_table;
-}
-
-
-void process_counts(record_data *record) {
-    char *k_substr;
-    int seq_length = strlen(record->sequence);
-    int num_kmers_in_seq = seq_length - record->kmer + 1;
-
-    for(int i=0; i<num_kmers_in_seq; i++) {
-        // Get kmer substring
-        k_substr = substr(record->sequence, i, record->kmer);
-
-        if(k_substr[record->kmer-1] != 'X' && k_substr[0] != 'X') {
-            kmer_add_value(record->counts_table, k_substr, 1, 0);
-        }
-
-        free(k_substr);
-    }
-
-    free(record->sequence);
 }
 
 
