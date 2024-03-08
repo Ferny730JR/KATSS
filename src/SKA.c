@@ -45,6 +45,9 @@ typedef struct {
 } record_data;
 
 
+void process_iteration(options *opt);
+
+
 kmerHashTable *count_kmers(char *filename, options *opt);
 
 
@@ -215,37 +218,46 @@ int main(int argc, char **argv) {
     ##########################################################*/
 
     while(opt.cur_iter < opt.iterations) {
-        if(opt.independent_probs) {
-            frqIndependentProbs kmer_data;
-            kmer_data = process_independent_probs(opt.bound_file, &opt);
-
-            input_table = predict_kmers(kmer_data.monomer_frq, kmer_data.dimer_frq, opt.kmer);
-            bound_table = kmer_data.kmer_frq;
-        } else {
-            input_table = count_kmers(opt.input_file, &opt);
-            bound_table = count_kmers(opt.bound_file, &opt);
-            getFrequencies(input_table);
-            getFrequencies(bound_table);
-        }
-
-        enrichments_table = getEnrichment(input_table, bound_table, &opt);
-
-        Entry *max_entry = kmer_max_entry(enrichments_table);
-        entry_to_file(opt.out_file, max_entry, opt.file_delimiter);
-
-        opt.top_kmer[opt.cur_iter] = strdup(max_entry->key);
-        opt.cur_iter++;
-
-        /* free tables */
-        free_kmer_table(enrichments_table);
-        free_kmer_table(input_table);
-        free_kmer_table(bound_table);
+        process_iteration(&opt);
     }
 
     /* Clean up */
     free_options(&opt);
 
     return 0;
+}
+
+
+void process_iteration(options *opt) {
+    kmerHashTable *input_table;
+    kmerHashTable *bound_table;
+    kmerHashTable *enrichments_table;
+
+    if(opt->independent_probs) {
+        frqIndependentProbs kmer_data;
+        kmer_data = process_independent_probs(opt->bound_file, opt);
+
+        input_table = predict_kmers(kmer_data.monomer_frq, kmer_data.dimer_frq, opt->kmer);
+        bound_table = kmer_data.kmer_frq;
+    } else {
+        input_table = count_kmers(opt->input_file, opt);
+        bound_table = count_kmers(opt->bound_file, opt);
+        getFrequencies(input_table);
+        getFrequencies(bound_table);
+    }
+
+    enrichments_table = getEnrichment(input_table, bound_table, opt);
+
+    Entry *max_entry = kmer_max_entry(enrichments_table);
+    entry_to_file(opt->out_file, max_entry, opt->file_delimiter);
+
+    opt->top_kmer[opt->cur_iter] = strdup(max_entry->key);
+    opt->cur_iter++;
+
+    /* free tables */
+    free_kmer_table(enrichments_table);
+    free_kmer_table(input_table);
+    free_kmer_table(bound_table);
 }
 
 
