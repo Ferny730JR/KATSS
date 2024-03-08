@@ -86,6 +86,12 @@ struct SKA_args_info
  original value given at command line.  */
   const char *jobs_help; /**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
  help description.  */
+  char * motif_arg;	/**< @brief Search for a specific motif, rather than all k-mers.
+.  */
+  char * motif_orig;	/**< @brief Search for a specific motif, rather than all k-mers.
+ original value given at command line.  */
+  const char *motif_help; /**< @brief Search for a specific motif, rather than all k-mers.
+ help description.  */
   
   unsigned int help_given ;	/**< @brief Whether help was given.  */
   unsigned int detailed_help_given ;	/**< @brief Whether detailed-help was given.  */
@@ -98,6 +104,7 @@ struct SKA_args_info
   unsigned int file_delimiter_given ;	/**< @brief Whether file-delimiter was given.  */
   unsigned int independent_probs_given ;	/**< @brief Whether independent-probs was given.  */
   unsigned int jobs_given ;	/**< @brief Whether jobs was given.  */
+  unsigned int motif_given ;	/**< @brief Whether motif was given.  */
 
   char **inputs ; /**< @brief unnamed options (options without names) */
   unsigned inputs_num ; /**< @brief unnamed options number */

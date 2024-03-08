@@ -85,3 +85,14 @@ typestr="number"
 default="0"
 argoptional
 optional
+
+option "motif" m
+"Search for a specific motif, rather than all k-mers.\n"
+details="If this option is provided, then the SKA program will search for specific k-mer sequences\
+ rather than all k-mers. The provided sequence can be a regular expression pattern, which the\
+ program will get the iterative enrichments for all k-mers that match the pattern. This option can\
+ be provided more than once to match against multiple patterns."
+string
+typestr="pattern"
+argoptional
+optional
