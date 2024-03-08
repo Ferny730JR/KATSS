@@ -21,6 +21,7 @@ add_executable(bppPipeline
 add_executable(SKA
     src/SKA.c
     src/rna_file_parser.c
+	src/kmer_counter.c
     src/kmerHashTable.c
     src/string_utils.c
     src/utils.c
