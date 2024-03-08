@@ -112,10 +112,6 @@ int main(int argc, char **argv) {
     struct SKA_args_info    args_info;
     options                 opt;
 
-    kmerHashTable           *input_table;
-    kmerHashTable           *bound_table;
-    kmerHashTable           *enrichments_table;
-
     init_default_options(&opt);
 
     /*##########################################################
@@ -170,6 +166,9 @@ int main(int argc, char **argv) {
             exit(EXIT_FAILURE);
         }
         opt.iterations = args_info.iterations_arg;
+		if(opt.iterations > 1<<(2*opt.kmer)) {
+			opt.iterations = 1<<(2*opt.kmer);
+		}
     }
 
     if(args_info.file_delimiter_given) {
