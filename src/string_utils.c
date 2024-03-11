@@ -104,6 +104,22 @@ void cross_out(char *s1, const char *s2) {
 }
 
 
+void clean_seq(char *sequence, int do_substitute) {
+	size_t ln = strlen(sequence)-1;
+
+	if(sequence[ln] == '\n') {  // remove trailing new line character
+		sequence[ln] = '\0';
+	}
+
+	for(unsigned int i = 0; sequence[i]; i++) {
+		sequence[i] = toupper(sequence[i]);
+		if(do_substitute && (sequence[i] == 'T' || sequence[i] == 't')) {
+			sequence[i] = 'U';
+		}
+	}
+}
+
+
 void str_to_upper(char *str) {
     if(!str) {
         error_message("Unable to read string %s",str);

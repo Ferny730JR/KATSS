@@ -98,6 +98,18 @@ void cross_out(char *s1, const char *s2);
 
 
 /**
+ *  @brief Clean a sequence string.
+ * 
+ *  This function removes trailing newline character returned from rnaf_get(), capitalizes every
+ *  nucleotide, and substitutes 'T' and 't' characters with 'U' if specified.
+ * 
+ *  @param sequence The null-terminated string to clean
+ *  @param do_substitute Substitute 'T' and 't' characters with 'U'
+*/
+void clean_seq(char *sequence, int do_substitute);
+
+
+/**
  *  @brief Capitalizes every lower case letter in string.
  * 
  *  @param str  String to capitalize
