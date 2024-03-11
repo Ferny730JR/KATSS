@@ -201,6 +201,9 @@ void process_iteration(options *opt) {
 
         input_table = predict_kmers(kmer_data.monomer_frq, kmer_data.dimer_frq, opt->kmer);
         bound_table = kmer_data.kmer_frq;
+
+		free_kmer_table(kmer_data.monomer_frq);
+		free_kmer_table(kmer_data.dimer_frq);
     } else {
         KmerCounter *input_counts = count_kmers(opt->input_file, opt);
 		input_table = get_frequencies(input_counts);
@@ -279,11 +282,17 @@ frqIndependentProbs process_independent_probs(char *filename, options *opt) {
 
 		free(sequence);
 	}
+	rnaf_close(read_file);
 
 	/* Get frequencies of the counts */
 	kmer_data.monomer_frq = get_frequencies(monomers_cnt);
 	kmer_data.dimer_frq = get_frequencies(dimers_cnt);
 	kmer_data.kmer_frq = get_frequencies(counts_cnt);
+
+	/* Clean up data */
+	free_kcounter(monomers_cnt);
+	free_kcounter(dimers_cnt);
+	free_kcounter(counts_cnt);
 
     return kmer_data;
 }
@@ -294,44 +303,40 @@ kmerHashTable *predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2me
     double          dinucleotides_prob;
     double          monomers_probs;
     double          *prob;
-    char            **kmers;
+	char			*k_str;
     char            *k_substr;
 
     predicted_kmers = init_kmer_table(kmer,1);
-    kmers = s_malloc(predicted_kmers->capacity * sizeof(char *));
-
-    /* Produce array of strings containing all k-mers */
-    for (unsigned long i = 0; i < predicted_kmers->capacity; i++) {
-        kmers[i] = malloc((kmer + 1) * sizeof(char));
-
-        int index = i;
-        for (int j = kmer - 1; j >= 0; j--) {
-            kmers[i][j] = BASES[index % 4];
-            index /= 4;
-        }
-        kmers[i][kmer] = '\0';
-    }
+	
+	k_str = s_malloc((kmer + 1) * sizeof(char));
+	k_str[kmer] = '\0';
 
     /* Get the probability of kmer being in reads */
     for(unsigned long i = 0; i < predicted_kmers->capacity; i++) {
+		int index = i;	/* Create next k-mer */
+		for(int j = kmer-1; j >= 0; j--) {
+			k_str[j] = BASES[index % 4];
+			index /= 4;
+		}
+
+		/* Calculate probability of created k-mer string */
         dinucleotides_prob = 1;
         monomers_probs     = 1;
         for(int j=0; j < kmer-1; j++) {
-            k_substr = substr(kmers[i], j, 2);
+            k_substr = substr(k_str, j, 2);
             prob = kmer_get(probs_2mer, k_substr);
             free(k_substr);
             dinucleotides_prob*=prob[0];
         }
         for(int j=1; j < kmer-1; j++) {
-            k_substr = substr(kmers[i], j, 1);
+            k_substr = substr(k_str, j, 1);
             prob = kmer_get(probs_1mer, k_substr);
             free(k_substr);
             monomers_probs*=prob[0];
         }
-        kmer_add_value(predicted_kmers, kmers[i], dinucleotides_prob/monomers_probs, 0);
-        free(kmers[i]);
+        kmer_add_value(predicted_kmers, k_str, dinucleotides_prob/monomers_probs, 0);
     }
-    free(kmers);
+	free(k_str);
 
     return predicted_kmers;
 }
