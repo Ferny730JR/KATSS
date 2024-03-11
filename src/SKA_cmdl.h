@@ -80,16 +80,14 @@ struct SKA_args_info
  (default=off).  */
   const char *independent_probs_help; /**< @brief Calculate the enrichments without the input reads.
  help description.  */
-  int jobs_arg;	/**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
- (default='0').  */
-  char * jobs_orig;	/**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
- original value given at command line.  */
-  const char *jobs_help; /**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
- help description.  */
-  char * motif_arg;	/**< @brief Search for a specific motif, rather than all k-mers.
+  char ** motif_arg;	/**< @brief Search for a specific motif, rather than all k-mers.
 .  */
-  char * motif_orig;	/**< @brief Search for a specific motif, rather than all k-mers.
+  char ** motif_orig;	/**< @brief Search for a specific motif, rather than all k-mers.
  original value given at command line.  */
+  unsigned int motif_min; /**< @brief Search for a specific motif, rather than all k-mers.
+'s minimum occurreces */
+  unsigned int motif_max; /**< @brief Search for a specific motif, rather than all k-mers.
+'s maximum occurreces */
   const char *motif_help; /**< @brief Search for a specific motif, rather than all k-mers.
  help description.  */
   
@@ -103,7 +101,6 @@ struct SKA_args_info
   unsigned int iterations_given ;	/**< @brief Whether iterations was given.  */
   unsigned int file_delimiter_given ;	/**< @brief Whether file-delimiter was given.  */
   unsigned int independent_probs_given ;	/**< @brief Whether independent-probs was given.  */
-  unsigned int jobs_given ;	/**< @brief Whether jobs was given.  */
   unsigned int motif_given ;	/**< @brief Whether motif was given.  */
 
   char **inputs ; /**< @brief unnamed options (options without names) */

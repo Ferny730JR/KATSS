@@ -77,15 +77,6 @@ details="Detailed description.\n"
 flag
 off
 
-option "jobs" j
-"Separate the files into separate jobs and start processing them in parallel using multiple\
- threads.\n"
-int
-typestr="number"
-default="0"
-argoptional
-optional
-
 option "motif" m
 "Search for a specific motif, rather than all k-mers.\n"
 details="If this option is provided, then the SKA program will search for specific k-mer sequences\
@@ -94,5 +85,5 @@ details="If this option is provided, then the SKA program will search for specif
  be provided more than once to match against multiple patterns."
 string
 typestr="pattern"
-argoptional
 optional
+multiple
