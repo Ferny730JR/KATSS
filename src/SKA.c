@@ -10,7 +10,6 @@
 #include "kmerHashTable.h"
 #include "string_utils.h"
 #include "utils.h"
-#include "parallel_helpers.h"
 
 #include "SKA_cmdl.h"
 
@@ -25,7 +24,6 @@ typedef struct options {
     char    file_delimiter;
 
     int     independent_probs;
-    int     jobs;
 
     char    **top_kmer;
     int     cur_iter;
@@ -48,16 +46,10 @@ KmerCounter *count_kmers(char *filename, options *opt);
 frqIndependentProbs process_independent_probs(char *filename, options *opt);
 
 
-void count_di_mono_nt(char *sequence, frqIndependentProbs kmer_data, options *opt);
-
-
 kmerHashTable *predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer);
 
 
 kmerHashTable *get_frequencies(KmerCounter *counts);
-
-
-void getFrequencies(kmerHashTable *counts_table);
 
 
 kmerHashTable *getEnrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt);
@@ -67,9 +59,6 @@ Entry *kmer_max_entry(kmerHashTable *hash_table);
 
 
 char delimiter_to_char(char *user_delimiter);
-
-
-int compare(const void *a, const void *b);
 
 
 void entry_to_file(FILE *file, Entry *entry, char delimiter);
@@ -92,7 +81,6 @@ void init_default_options(options *opt) {
     opt->file_delimiter = ',';
 
     opt->independent_probs  = 0;
-    opt->jobs               = 0;
 
     opt->top_kmer       = NULL;
     opt->cur_iter       = 0;
@@ -172,25 +160,6 @@ int main(int argc, char **argv) {
     if(args_info.independent_probs_given) {
         opt.independent_probs = 1;
     }
-
-    if(args_info.jobs_given) {
-        int thread_max = max_user_threads();
-
-        if (args_info.jobs_arg == 0) {
-            /* use maximum of concurrent threads */
-            int proc_cores, proc_cores_conf;
-            if (num_proc_cores(&proc_cores, &proc_cores_conf)) {
-                opt.jobs = MIN2(thread_max, proc_cores_conf);
-            } else {
-                warning_message("Could not determine number of available processor cores!\n"
-                                "Defaulting to serial computation");
-                opt.jobs = 1;
-            }
-        } else {
-            opt.jobs = MIN2(thread_max, args_info.jobs_arg);
-        }
-		opt.jobs = MAX2(1, opt.jobs);
-	}
 
 	char *filename = concat(opt.out_filename, ".dsv");
 	opt.out_file = fopen(filename, "w");
@@ -320,34 +289,6 @@ frqIndependentProbs process_independent_probs(char *filename, options *opt) {
 }
 
 
-void count_di_mono_nt(char *sequence, frqIndependentProbs kmer_data, options *opt) {
-    char    *k_substr;
-    int     seq_length = strlen(sequence);
-    int     num_kmers_in_seq = seq_length - opt->kmer + 1;
-
-    for(int i=0; i<seq_length; i++) {
-        // count monomers
-        k_substr = substr(sequence, i, 1);
-        kmer_add_value(kmer_data.monomer_frq, k_substr, 1, 0);
-        free(k_substr);
-
-        // count dimers
-        if(i<seq_length-1) {
-            k_substr = substr(sequence, i, 2);
-            kmer_add_value(kmer_data.dimer_frq, k_substr, 1, 0);
-            free(k_substr);
-        }
-
-        // counts kmers
-        if(i<num_kmers_in_seq) {
-            k_substr = substr(sequence, i, opt->kmer);
-            kmer_add_value(kmer_data.kmer_frq, k_substr, 1, 0);
-            free(k_substr);
-        }
-    }
-}
-
-
 kmerHashTable *predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer) {
     kmerHashTable   *predicted_kmers;
     double          dinucleotides_prob;
@@ -413,28 +354,6 @@ kmerHashTable *get_frequencies(KmerCounter *counts) {
 	}
 
 	return frq_table;
-}
-
-
-void getFrequencies(kmerHashTable *counts_table) {
-    unsigned int num_columns = counts_table->cols-1;
-    double total_count = 0;
-    double k_count;
-
-    for(unsigned long i=0; i<counts_table->capacity; i++) {
-        if(counts_table->entries[i] == NULL) {
-            continue;
-        }
-        total_count+=counts_table->entries[i]->values[0];
-    }
-
-    for(unsigned long i=0; i<counts_table->capacity; i++) {
-        if(counts_table->entries[i] == NULL) {
-            continue;
-        }
-        k_count = counts_table->entries[i]->values[0];
-        counts_table->entries[i]->values[num_columns] = k_count/total_count;
-    }
 }
 
 
@@ -524,31 +443,6 @@ char delimiter_to_char(char *user_delimiter) {
 }
 
 
-int compare(const void *a, const void *b) {
-    const Entry *entryA = *(Entry **)a;
-    const Entry *entryB = *(Entry **)b;
-
-    if(!entryA && !entryB) {
-        return 0;
-    }
-    if(!entryA) {
-        return 1;
-    }
-    if(!entryB) {
-        return -1;
-    }
-
-    if(entryA->values[0] > entryB->values[0]) {
-        return -1;
-    }
-    if(entryA->values[0] < entryB->values[0]) {
-        return 1;
-    }
-
-    return 0;
-}
-
-
 void entry_to_file(FILE *file, Entry *entry, char delimiter) {
     fprintf(file, "%s%c%f\n", entry->key, delimiter, entry->values[0]);
 }
@@ -578,6 +472,5 @@ void print_options(options *opt) {
     printf("output_file: '%s'\n",opt->out_filename);
     printf("kmer: '%d'\n",opt->kmer);
     printf("iterations: '%d'\n",opt->iterations);
-    printf("jobs: '%d'\n",opt->jobs);
     printf("probs: '%d'\n",opt->independent_probs);
 }
