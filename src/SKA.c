@@ -284,35 +284,37 @@ KmerCounter *count_kmers(char *filename, options *opt) {
 
 
 frqIndependentProbs process_independent_probs(char *filename, options *opt) {
-    FILE                    *read_file;
-    kmerHashTable           *monomers_table;
-    kmerHashTable           *dimers_table;
-    kmerHashTable           *counts_table;
-    frqIndependentProbs     kmer_data;
+	frqIndependentProbs     kmer_data;
+	RNA_FILE *read_file = rnaf_open(filename);
 
-    read_file = fopen(filename, "r");
+    KmerCounter *monomers_cnt = init_kcounter(1);
+    KmerCounter *dimers_cnt = init_kcounter(2);
+    KmerCounter *counts_cnt = init_kcounter(opt->kmer);
 
-    monomers_table  = init_kmer_table(1,1);
-    dimers_table    = init_kmer_table(2,1);
-    counts_table    = init_kmer_table(opt->kmer, 1);
+	/* Count di/monomers & k-mers */
+	char *sequence = NULL;
+	while(1) {
+		sequence = rnaf_get(read_file);
+		if(sequence == NULL) {
+			break;
+		}
 
-    kmer_data.monomer_frq = monomers_table;
-    kmer_data.dimer_frq   = dimers_table;
-    kmer_data.kmer_frq    = counts_table;
+		clean_seq(sequence, 1);
+		for(int i=0; i<opt->cur_iter; i++) {
+			cross_out(sequence, opt->top_kmer[i]);
+		}
 
-    char buffer[10000];
-    while(fgets(buffer, sizeof(buffer), read_file)) {
-        str_to_upper(buffer);
-        seq_to_RNA(buffer);
-        remove_escapes(buffer);
+		kctr_increment(monomers_cnt, sequence);
+		kctr_increment(dimers_cnt, sequence);
+		kctr_increment(counts_cnt, sequence);
 
-        count_di_mono_nt(buffer, kmer_data, opt);
-    }
-    fclose(read_file);
+		free(sequence);
+	}
 
-    getFrequencies(kmer_data.monomer_frq);
-    getFrequencies(kmer_data.dimer_frq);
-    getFrequencies(kmer_data.kmer_frq);
+	/* Get frequencies of the counts */
+	kmer_data.monomer_frq = get_frequencies(monomers_cnt);
+	kmer_data.dimer_frq = get_frequencies(dimers_cnt);
+	kmer_data.kmer_frq = get_frequencies(counts_cnt);
 
     return kmer_data;
 }
