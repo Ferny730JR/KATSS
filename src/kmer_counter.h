@@ -5,6 +5,7 @@ typedef struct KmerCounter {
 	unsigned int k_mer;         /**< Length of k-mers to be counted. */
 	unsigned int capacity;      /**< Capacity of the k-mer counter (4^k_mer). */
 	unsigned int *entries;      /**< Array to store counts of each k-mer. */
+	unsigned long total_count;
 } KmerCounter;
 
 
