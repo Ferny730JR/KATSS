@@ -42,7 +42,7 @@ typedef struct {
 void process_iteration(options *opt);
 
 
-kmerHashTable *count_kmers(char *filename, options *opt);
+KmerCounter *count_kmers(char *filename, options *opt);
 
 
 frqIndependentProbs process_independent_probs(char *filename, options *opt);
@@ -52,6 +52,9 @@ void count_di_mono_nt(char *sequence, frqIndependentProbs kmer_data, options *op
 
 
 kmerHashTable *predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer);
+
+
+kmerHashTable *get_frequencies(KmerCounter *counts);
 
 
 void getFrequencies(kmerHashTable *counts_table);
@@ -186,35 +189,35 @@ int main(int argc, char **argv) {
         } else {
             opt.jobs = MIN2(thread_max, args_info.jobs_arg);
         }
-        opt.jobs = MAX2(1, opt.jobs);
-    }
+		opt.jobs = MAX2(1, opt.jobs);
+	}
 
-    char *filename = concat(opt.out_filename, ".dsv");
-    opt.out_file = fopen(filename, "w");
-    if (opt.out_file == NULL) {
-        error_message("Could not write to file '%s'\n",filename);
-    }
+	char *filename = concat(opt.out_filename, ".dsv");
+	opt.out_file = fopen(filename, "w");
+	if (opt.out_file == NULL) {
+		error_message("Could not write to file '%s'\n",filename);
+	}
 
-    opt.top_kmer = s_malloc(opt.iterations * sizeof(char *));
-    for(int i=0; i<opt.iterations; i++) {
-        opt.top_kmer[i] = NULL;
-    }
+	opt.top_kmer = s_malloc(opt.iterations * sizeof(char *));
+	for(int i=0; i<opt.iterations; i++) {
+		opt.top_kmer[i] = NULL;
+	}
 
-    SKA_cmdline_parser_free(&args_info);
-    free(filename);
+	SKA_cmdline_parser_free(&args_info);
+	free(filename);
 
-    /*##########################################################
-    #  Computations                                            #
-    ##########################################################*/
+	/*##########################################################
+	#  Computations                                            #
+	##########################################################*/
 
-    while(opt.cur_iter < opt.iterations) {
-        process_iteration(&opt);
-    }
+	while(opt.cur_iter < opt.iterations) {
+		process_iteration(&opt);
+	}
 
-    /* Clean up */
-    free_options(&opt);
+	/* Clean up */
+	free_options(&opt);
 
-    return 0;
+	return 0;
 }
 
 
@@ -230,10 +233,13 @@ void process_iteration(options *opt) {
         input_table = predict_kmers(kmer_data.monomer_frq, kmer_data.dimer_frq, opt->kmer);
         bound_table = kmer_data.kmer_frq;
     } else {
-        input_table = count_kmers(opt->input_file, opt);
-        bound_table = count_kmers(opt->bound_file, opt);
-        getFrequencies(input_table);
-        getFrequencies(bound_table);
+        KmerCounter *input_counts = count_kmers(opt->input_file, opt);
+		input_table = get_frequencies(input_counts);
+		free_kcounter(input_counts);
+
+        KmerCounter *bound_counts = count_kmers(opt->bound_file, opt);
+		bound_table = get_frequencies(bound_counts);
+		free_kcounter(bound_counts);
     }
 
     enrichments_table = getEnrichment(input_table, bound_table, opt);
@@ -251,43 +257,29 @@ void process_iteration(options *opt) {
 }
 
 
-kmerHashTable *count_kmers(char *filename, options *opt) {
-    RNA_FILE *read_file;
-    kmerHashTable *counts_table;
-	KmerCounter *counter;
+KmerCounter *count_kmers(char *filename, options *opt) {
+	RNA_FILE *read_file = rnaf_open(filename);;
+	KmerCounter *counter = init_kcounter(opt->kmer);;
 
-    counts_table = init_kmer_table(opt->kmer, 1);
-    read_file	 = rnaf_open(filename);
-	counter		 = init_kcounter(opt->kmer);
+	char *sequence;
+	while(1) {
+		sequence = rnaf_get(read_file);
 
-    char *sequence;
-    while(1) {
-        sequence = rnaf_get(read_file);
+		if(sequence == NULL) {
+			break;
+		}
 
-        if(sequence == NULL) {
-            break;
-        }
-
-        seq_to_RNA(sequence);
-        str_to_upper(sequence);
-        remove_escapes(sequence);
-        for(int i=0; i<opt->cur_iter; i++) {
-            cross_out(sequence, opt->top_kmer[i]);
-        }
+		clean_seq(sequence, 1);
+		for(int i=0; i<opt->cur_iter; i++) {
+			cross_out(sequence, opt->top_kmer[i]);
+		}
 
 		kctr_increment(counter, sequence);
 		free(sequence);
-    }
-    rnaf_close(read_file);
-
-	counts_table = init_kmer_table(opt->kmer, 1);
-	for(unsigned int i=0; i<counter->capacity; i++) {
-		sequence = kctr_get_key(counter, i);
-		kmer_add_value(counts_table, sequence, kctr_get(counter, sequence), 0);
-		free(sequence);
 	}
+	rnaf_close(read_file);
 
-    return counts_table;
+	return counter;
 }
 
 
@@ -399,6 +391,26 @@ kmerHashTable *predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2me
     free(kmers);
 
     return predicted_kmers;
+}
+
+
+kmerHashTable *get_frequencies(KmerCounter *counts) {
+	kmerHashTable *frq_table = init_kmer_table(counts->k_mer, 1);
+	unsigned long total_kcounts = counts->total_count;
+
+	unsigned int kcount;
+	for(unsigned int i=0; i<counts->capacity; i++) {
+		if(!(kcount=counts->entries[i])) {
+			continue;
+		}
+
+		char *key = kctr_get_key(counts, i);
+		double k_frequency = (double)kcount/total_kcounts; // calculate frequency
+		kmer_add_value(frq_table, key, k_frequency, 0);
+		free(key);
+	}
+
+	return frq_table;
 }
 
 
