@@ -14,63 +14,80 @@
 #include "SKA_cmdl.h"
 
 typedef struct options {
-    char    *input_file;
-    char    *bound_file;
-    char    *out_filename;
-    FILE    *out_file;
-    int     out_given;
-    int     kmer;
-    int     iterations;
-    char    file_delimiter;
+	char    *input_file;
+	char    *bound_file;
+	char    *out_filename;
+	FILE    *out_file;
+	int     out_given;
+	int     kmer;
+	int     iterations;
+	char    file_delimiter;
 
-    int     independent_probs;
+	int     independent_probs;
 
-    char    **top_kmer;
-    int     cur_iter;
+	char    **top_kmer;
+	int     cur_iter;
 } options;
 
 
 typedef struct {
-    kmerHashTable *monomer_frq;
-    kmerHashTable *dimer_frq;
-    kmerHashTable *kmer_frq;
-} frqIndependentProbs;
+	kmerHashTable *monomer_frq;
+	kmerHashTable *dimer_frq;
+	kmerHashTable *kmer_frq;
+} FrqIndependentProbs;
 
 
-void process_iteration(options *opt);
+/*##########################################################
+#  Function Declarations                                   #
+##########################################################*/
+
+void 
+process_iteration(options *opt);
 
 
-KmerCounter *count_kmers(char *filename, options *opt);
+KmerCounter *
+count_kmers(char *filename, options *opt);
 
 
-frqIndependentProbs process_independent_probs(char *filename, options *opt);
+FrqIndependentProbs
+process_independent_probs(char *filename, options *opt);
 
 
-kmerHashTable *predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer);
+kmerHashTable *
+predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer);
 
 
-kmerHashTable *get_frequencies(KmerCounter *counts);
+kmerHashTable *
+get_frequencies(KmerCounter *counts);
 
 
-kmerHashTable *getEnrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt);
+kmerHashTable *
+get_enrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt);
 
 
-Entry *kmer_max_entry(kmerHashTable *hash_table);
+Entry *
+kmer_max_entry(kmerHashTable *hash_table);
 
 
-char delimiter_to_char(char *user_delimiter);
+char
+delimiter_to_char(char *user_delimiter);
 
 
-void entry_to_file(FILE *file, Entry *entry, char delimiter);
+void
+entry_to_file(FILE *file, Entry *entry, char delimiter);
 
 
-void free_options(options *opt);
+void
+free_options(options *opt);
 
 
-void print_options(options *opt);
+void
+print_options(options *opt);
 
 
-void init_default_options(options *opt) {
+void 
+init_default_options(options *opt)
+{
     opt->input_file     = NULL;
     opt->bound_file     = NULL;
     opt->out_filename   = "motif";
@@ -90,7 +107,9 @@ void init_default_options(options *opt) {
 /*##########################################################
 #  Main                                                    #
 ##########################################################*/
-int main(int argc, char **argv) {
+int
+main(int argc, char **argv)
+{
     struct SKA_args_info    args_info;
     options                 opt;
 
@@ -190,48 +209,56 @@ int main(int argc, char **argv) {
 }
 
 
-void process_iteration(options *opt) {
-    kmerHashTable *input_table;
-    kmerHashTable *bound_table;
-    kmerHashTable *enrichments_table;
+/*##########################################################
+#  Main Functions                                          #
+##########################################################*/
 
-    if(opt->independent_probs) {
-        frqIndependentProbs kmer_data;
-        kmer_data = process_independent_probs(opt->bound_file, opt);
+void 
+process_iteration(options *opt)
+{
+	kmerHashTable *input_table;
+	kmerHashTable *bound_table;
+	kmerHashTable *enrichments_table;
 
-        input_table = predict_kmers(kmer_data.monomer_frq, kmer_data.dimer_frq, opt->kmer);
-        bound_table = kmer_data.kmer_frq;
+	if(opt->independent_probs) {
+		FrqIndependentProbs kmer_data;
+		kmer_data = process_independent_probs(opt->bound_file, opt);
+
+		input_table = predict_kmers(kmer_data.monomer_frq, kmer_data.dimer_frq, opt->kmer);
+		bound_table = kmer_data.kmer_frq;
 
 		free_kmer_table(kmer_data.monomer_frq);
 		free_kmer_table(kmer_data.dimer_frq);
-    } else {
-        KmerCounter *input_counts = count_kmers(opt->input_file, opt);
+	} else {
+		KmerCounter *input_counts = count_kmers(opt->input_file, opt);
 		input_table = get_frequencies(input_counts);
 		free_kcounter(input_counts);
 
-        KmerCounter *bound_counts = count_kmers(opt->bound_file, opt);
+		KmerCounter *bound_counts = count_kmers(opt->bound_file, opt);
 		bound_table = get_frequencies(bound_counts);
 		free_kcounter(bound_counts);
-    }
+	}
 
-    enrichments_table = getEnrichment(input_table, bound_table, opt);
+	enrichments_table = get_enrichment(input_table, bound_table, opt);
 
-    Entry *max_entry = kmer_max_entry(enrichments_table);
-    entry_to_file(opt->out_file, max_entry, opt->file_delimiter);
+	Entry *max_entry = kmer_max_entry(enrichments_table);
+	entry_to_file(opt->out_file, max_entry, opt->file_delimiter);
 
-    opt->top_kmer[opt->cur_iter] = strdup(max_entry->key);
-    opt->cur_iter++;
+	opt->top_kmer[opt->cur_iter] = strdup(max_entry->key);
+	opt->cur_iter++;
 
-    /* free tables */
-    free_kmer_table(enrichments_table);
-    free_kmer_table(input_table);
-    free_kmer_table(bound_table);
+	/* free tables */
+	free_kmer_table(enrichments_table);
+	free_kmer_table(input_table);
+	free_kmer_table(bound_table);
 }
 
 
-KmerCounter *count_kmers(char *filename, options *opt) {
-	RNA_FILE *read_file = rnaf_open(filename);;
-	KmerCounter *counter = init_kcounter(opt->kmer);;
+KmerCounter *
+count_kmers(char *filename, options *opt)
+{
+	RNA_FILE *read_file = rnaf_open(filename);
+	KmerCounter *counter = init_kcounter(opt->kmer);
 
 	char *sequence;
 	while(1) {
@@ -255,8 +282,10 @@ KmerCounter *count_kmers(char *filename, options *opt) {
 }
 
 
-frqIndependentProbs process_independent_probs(char *filename, options *opt) {
-	frqIndependentProbs     kmer_data;
+FrqIndependentProbs
+process_independent_probs(char *filename, options *opt)
+{
+	FrqIndependentProbs     kmer_data;
 	RNA_FILE *read_file = rnaf_open(filename);
 
     KmerCounter *monomers_cnt = init_kcounter(1);
@@ -298,7 +327,9 @@ frqIndependentProbs process_independent_probs(char *filename, options *opt) {
 }
 
 
-kmerHashTable *predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer) {
+kmerHashTable *
+predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer)
+{
     kmerHashTable   *predicted_kmers;
     double          dinucleotides_prob;
     double          monomers_probs;
@@ -342,7 +373,9 @@ kmerHashTable *predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2me
 }
 
 
-kmerHashTable *get_frequencies(KmerCounter *counts) {
+kmerHashTable *
+get_frequencies(KmerCounter *counts)
+{
 	kmerHashTable *frq_table = init_kmer_table(counts->k_mer, 1);
 	unsigned long total_kcounts = counts->total_count;
 
@@ -362,7 +395,9 @@ kmerHashTable *get_frequencies(KmerCounter *counts) {
 }
 
 
-kmerHashTable *getEnrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt) {
+kmerHashTable *
+get_enrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt)
+{
     kmerHashTable   *enrichments_table;
     char            *key;
     double          *input_values;
@@ -397,7 +432,9 @@ kmerHashTable *getEnrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq,
 #  Helper Functions                                        #
 ##########################################################*/
 
-Entry *kmer_max_entry(kmerHashTable *hash_table) {
+Entry *
+kmer_max_entry(kmerHashTable *hash_table)
+{
     double max_value = -DBL_MAX;
     Entry *max_entry = NULL;
     for(unsigned long i=0; i<hash_table->capacity; i++) {
@@ -415,7 +452,9 @@ Entry *kmer_max_entry(kmerHashTable *hash_table) {
 }
 
 
-char delimiter_to_char(char *user_delimiter) {
+char 
+delimiter_to_char(char *user_delimiter)
+{
     char delimiter;
     char provided_val = user_delimiter[0];
     if(strlen(user_delimiter)>1) {
@@ -448,12 +487,16 @@ char delimiter_to_char(char *user_delimiter) {
 }
 
 
-void entry_to_file(FILE *file, Entry *entry, char delimiter) {
+void 
+entry_to_file(FILE *file, Entry *entry, char delimiter)
+{
     fprintf(file, "%s%c%f\n", entry->key, delimiter, entry->values[0]);
 }
 
 
-void free_options(options *opt) {
+void 
+free_options(options *opt)
+{
     if(opt->input_file && !opt->independent_probs) {
         free(opt->input_file);
     }
@@ -471,7 +514,9 @@ void free_options(options *opt) {
 }
 
 
-void print_options(options *opt) {
+void
+print_options(options *opt)
+{
     printf("input_file: '%s'\n",opt->input_file);
     printf("bound_file: '%s'\n",opt->bound_file);
     printf("output_file: '%s'\n",opt->out_filename);
