@@ -9,9 +9,10 @@
  *  Represents an RNA file for reading, including file information and a character buffer.
  *  The struct is used in conjunction with RNA file parsing functions.
  */
-typedef struct {
+typedef struct RNA_FILE {
     FILE *file;                     /** File pointer for the RNA file. */
-    char buffer[MAX_SEQ_LENGTH];    /** Character buffer to store sequence data. */
+    char *buffer;                   /** Character buffer to store sequence data. */
+	unsigned int buffer_size;       /** Int to store the size of the buffer */
     char *end_of_file;              /** Pointer to the end of the file indicator. */
     char filetype;                  /** Character to store which file type was passed. */
 } RNA_FILE;
@@ -58,5 +59,26 @@ char *rnaf_get(RNA_FILE *rna_file);
  */
 void rnaf_close(RNA_FILE *rna_file);
 
+
+/**
+ *  @brief Change the size of the buffer
+ * 
+ *  This function reallocates the amount of memory the buffer uses.
+ * 
+ *  @param rna_file A pointer to the RNA_FILE struct representing the opened file
+ *  @param size The new size of the buffer in bytes (number of chars)
+*/
+void
+rnaf_rebuff(RNA_FILE *rna_file, unsigned int size);
+
+
+/**
+ *  @brief Search for sequence in RNA_FILE
+*/
+unsigned int
+rnaf_search(RNA_FILE *rna_file, const char *sequence);
+
+
+void rnaf_read(RNA_FILE *rna_file, unsigned int offset);
 
 #endif // FILE_PARSER

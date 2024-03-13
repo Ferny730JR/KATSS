@@ -6,6 +6,8 @@
 #include "string_utils.h"
 #include "utils.h"
 
+#define NO_OF_CHARS 256
+
 /* Function declarations */
 
 void parse_fasta(RNA_FILE *rna_file, char **ret_seq);
@@ -20,60 +22,118 @@ int is_nucleotide(char character);
 
 int is_full(char *buffer, int buffer_size);
 
+int max(int a, int b);
+
+void 
+rnaf_read(RNA_FILE *rna_file, unsigned int offset);
+
+void 
+badCharHeuristic(const char* str, int size, int badchar[NO_OF_CHARS]);
+
 
 /*##########################################################
 #  Main Functions (Used in header)                         #
 ##########################################################*/
 
 RNA_FILE *rnaf_open(char* filename) {
-    RNA_FILE *rna_file = s_malloc(sizeof *rna_file);
-    rna_file->file = fopen(filename, "r");
-    memset(rna_file->buffer, 0, sizeof(char)*MAX_SEQ_LENGTH); // init buffer to '\0'
+	RNA_FILE *rna_file = s_malloc(sizeof *rna_file);
+	rna_file->file = fopen(filename, "r");
+	rna_file->buffer = s_malloc(MAX_SEQ_LENGTH * sizeof(char));
+	rna_file->buffer_size = MAX_SEQ_LENGTH;
+	memset(rna_file->buffer, 0, MAX_SEQ_LENGTH * sizeof(char)); // init buffer to '\0'
 
-    /* Check if we can open file for reading */
-    if( (rna_file->file) == NULL ) {
-        free(rna_file);
-        error_message("Failed to open file '%s'",filename);
-        return NULL;
-    }
+	/* Check if we can open file for reading */
+	if( (rna_file->file) == NULL ) {
+		free(rna_file);
+		error_message("Failed to open file '%s'",filename);
+		return NULL;
+	}
 
-    /* Check if file contains a valid line */
-    rna_file->end_of_file = fgets(rna_file->buffer, sizeof(rna_file->buffer), rna_file->file);
-    if(rna_file->end_of_file == NULL) { 
-        fclose(rna_file->file);
-        free(rna_file);
-        warning_message("File '%s' contains no sequences.",filename);
-        return NULL;
-    }
+	/* Check if file contains a valid line */
+	rna_file->end_of_file = fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file);
+	if(rna_file->end_of_file == NULL) { 
+		fclose(rna_file->file);
+		free(rna_file);
+		warning_message("File '%s' contains no sequences.",filename);
+		return NULL;
+	}
 
-    /* Determine what type of file was passed */
-    rna_file->filetype = determine_filetype(rna_file->buffer[0]);
+	/* Determine what type of file was passed */
+	rna_file->filetype = determine_filetype(rna_file->buffer[0]);
 
-    return rna_file;
+	return rna_file;
 }
 
 
 char *rnaf_get(RNA_FILE *rna_file) {
-    char *seq = NULL;
-    
-    /* Check the type of file format */
-    switch(rna_file->filetype) {
-        case 'a':   parse_fasta(rna_file, &seq);    break;
-        case 'q':   parse_fastq(rna_file, &seq);    break;
-        case 'r':   parse_reads(rna_file, &seq);    break;
-        default:
-            error_message("Unable to read sequence from file.\nCurrent supported file types are:"
-            " FASTA, FASTQ, and files containing sequences per line.");
-            break;
-    }
+	char *seq = NULL;
 
-    return seq;
+	/* Check the type of file format */
+	switch(rna_file->filetype) {
+		case 'a':   parse_fasta(rna_file, &seq);    break;
+		case 'q':   parse_fastq(rna_file, &seq);    break;
+		case 'r':   parse_reads(rna_file, &seq);    break;
+		default:
+			error_message("Unable to read sequence from file.\nCurrent supported file types are:"
+			" FASTA, FASTQ, and files containing sequences per line.");
+			break;
+	}
+
+	return seq;
 }
 
 
 void rnaf_close(RNA_FILE *rna_file) {
-    fclose(rna_file->file);
-    free(rna_file);
+	fclose(rna_file->file);
+	free(rna_file->buffer);
+	free(rna_file);
+}
+
+
+void
+rnaf_rebuff(RNA_FILE *rna_file, unsigned int size)
+{
+	rna_file->buffer = s_realloc(rna_file->buffer, size+1);
+	rna_file->buffer_size = size;
+	rewind(rna_file->file);
+	memset(rna_file->buffer, 0, (size+1) * sizeof(char));
+}
+
+
+unsigned int
+rnaf_search(RNA_FILE *rna_file, const char *sequence)
+{
+	unsigned int counts = 0;
+	unsigned int m = strlen(sequence);
+	unsigned int n = rna_file->buffer_size;
+
+	if(n==0) {
+		return 0;
+	}
+
+	int badchar[NO_OF_CHARS];
+	badCharHeuristic(sequence, m, badchar);
+
+	int s = 0;
+	while (s <= (n - m)) {
+		int j = m - 1;
+
+		while (j >= 0 && sequence[j] == rna_file->buffer[s + j]) {
+			j--;
+		}
+
+		if (j < 0) {
+			// printf("pattern occurs at shift = %d\n", s);
+			counts++;
+			s += (s + m < n) ? m - badchar[rna_file->buffer[s + m]] : 1;
+		}
+
+		else {
+			s += max(1, j - badchar[rna_file->buffer[s + j]]);
+		}
+	}
+
+	return counts;
 }
 
 
@@ -196,4 +256,44 @@ int is_full(char *buffer, int buffer_size) {
     }
 
     return ret;
+}
+
+
+void 
+rnaf_read(RNA_FILE *rna_file, unsigned int offset)
+{
+	for(unsigned int i=0; i<offset; i++) {
+		unsigned int indx = rna_file->buffer_size-(offset-i);
+		rna_file->buffer[i] = rna_file->buffer[indx];
+	}
+
+	unsigned int len, ret;
+	len = rna_file->buffer_size - offset;
+	ret = fread(rna_file->buffer+offset, 1, len, rna_file->file);
+
+	if(len == ret) {
+		return;
+	}
+	for(unsigned int i=offset+ret; i<rna_file->buffer_size; i++) {
+		rna_file->buffer[i] = '\0';
+	}
+}
+ 
+// A utility function to get maximum of two integers
+int max(int a, int b) { return (a > b) ? a : b; }
+ 
+// The preprocessing function for Boyer Moore's
+// bad character heuristic
+void 
+badCharHeuristic(const char* str, int size, int badchar[NO_OF_CHARS])
+{
+	int i;
+
+	for (i = 0; i < NO_OF_CHARS; i++) {
+		badchar[i] = -1;
+	}
+
+	for (i = 0; i < size; i++) {
+		badchar[(int)str[i]] = i;
+	}
 }
