@@ -24,6 +24,7 @@ typedef struct options {
 	char    file_delimiter;
 
 	int     independent_probs;
+	char	**motif;
 
 	char    **top_kmer;
 	int     cur_iter;
@@ -88,19 +89,20 @@ print_options(options *opt);
 void 
 init_default_options(options *opt)
 {
-    opt->input_file     = NULL;
-    opt->bound_file     = NULL;
-    opt->out_filename   = "motif";
-    opt->out_file       = NULL;
-    opt->out_given      = 0;
-    opt->kmer           = 3;
-    opt->iterations     = 1;
-    opt->file_delimiter = ',';
+	opt->input_file     = NULL;
+	opt->bound_file     = NULL;
+	opt->out_filename   = "motif";
+	opt->out_file       = NULL;
+	opt->out_given      = 0;
+	opt->kmer           = 3;
+	opt->iterations     = 1;
+	opt->file_delimiter = ',';
 
-    opt->independent_probs  = 0;
+	opt->independent_probs  = 0;
+	opt->motif              = NULL;
 
-    opt->top_kmer       = NULL;
-    opt->cur_iter       = 0;
+	opt->top_kmer       = NULL;
+	opt->cur_iter       = 0;
 }
 
 
@@ -110,75 +112,80 @@ init_default_options(options *opt)
 int
 main(int argc, char **argv)
 {
-    struct SKA_args_info    args_info;
-    options                 opt;
+	struct SKA_args_info    args_info;
+	options                 opt;
 
-    init_default_options(&opt);
+	init_default_options(&opt);
 
-    /*##########################################################
-    #  Parse Command Line Arguments                            #
-    ##########################################################*/
+	/*##########################################################
+	#  Parse Command Line Arguments                            #
+	##########################################################*/
 
-    if (SKA_cmdline_parser(argc, argv, &args_info) != 0) {
-        exit(EXIT_FAILURE);
-    }
+	if (SKA_cmdline_parser(argc, argv, &args_info) != 0) {
+		exit(EXIT_FAILURE);
+	}
 
-    if(args_info.input_given) {
-        opt.input_file = strdup(args_info.input_arg);
-        if(access(opt.input_file, F_OK|R_OK) != 0) {
-            error_message("Unable to open input file '%s' for reading.",args_info.input_arg);
-            SKA_cmdline_parser_free(&args_info);
-            free_options(&opt);
-            exit(EXIT_FAILURE);
-        }
-    }
+	if(args_info.input_given) {
+		opt.input_file = strdup(args_info.input_arg);
+		if(access(opt.input_file, F_OK|R_OK) != 0) {
+			error_message("Unable to open input file '%s' for reading.",args_info.input_arg);
+			SKA_cmdline_parser_free(&args_info);
+			free_options(&opt);
+			exit(EXIT_FAILURE);
+		}
+	}
 
-    if(args_info.bound_given) {
-        opt.bound_file = strdup(args_info.bound_arg);
-        if(access(opt.bound_file, F_OK|R_OK) != 0) {
-            error_message("Unable to open bound file '%s' for reading.",args_info.bound_arg);
-            SKA_cmdline_parser_free(&args_info);
-            free_options(&opt);
-            exit(EXIT_FAILURE);
-        }
-    }
+	if(args_info.bound_given) {
+		opt.bound_file = strdup(args_info.bound_arg);
+		if(access(opt.bound_file, F_OK|R_OK) != 0) {
+			error_message("Unable to open bound file '%s' for reading.",args_info.bound_arg);
+			SKA_cmdline_parser_free(&args_info);
+			free_options(&opt);
+			exit(EXIT_FAILURE);
+		}
+	}
 
-    if(args_info.output_given) {
-        opt.out_given    = 1;
-        opt.out_filename = strdup(args_info.output_arg);
-    }
-    
-    if(args_info.kmer_given) {
-        if(args_info.kmer_arg <= 0) {
-            error_message("option '--kmer=%d' must be a value greater than 0.",args_info.kmer_arg);
-            SKA_cmdline_parser_free(&args_info);
-            free_options(&opt);
-            exit(EXIT_FAILURE);
-        }
-        opt.kmer = args_info.kmer_arg;
-    }
+	if(args_info.output_given) {
+		opt.out_given    = 1;
+		opt.out_filename = strdup(args_info.output_arg);
+	}
 
-    if(args_info.iterations_given) {
-        if(args_info.iterations_arg <= 0) {
-            error_message("option '--iterations=%d' must be a value greater than 0.",
-             args_info.kmer_arg);
-            SKA_cmdline_parser_free(&args_info);
-            free_options(&opt);
-            exit(EXIT_FAILURE);
-        }
-        opt.iterations = args_info.iterations_arg;
-		if(opt.iterations > 1<<(2*opt.kmer)) {
+	if(args_info.kmer_given) {
+		if(args_info.kmer_arg <= 0) {
+			error_message("option '--kmer=%d' must be a value greater than 0.",args_info.kmer_arg);
+			SKA_cmdline_parser_free(&args_info);
+			free_options(&opt);
+			exit(EXIT_FAILURE);
+		}
+		opt.kmer = args_info.kmer_arg;
+	}
+
+	if(args_info.iterations_given) {
+		if(args_info.iterations_arg <= 0) {
+			error_message("option '--iterations=%d' must be a value greater than 0.",
+			 args_info.kmer_arg);
+			SKA_cmdline_parser_free(&args_info);
+			free_options(&opt);
+			exit(EXIT_FAILURE);
+		}
+		opt.iterations = args_info.iterations_arg;
+
+		if(opt.iterations > 1<<(2*opt.kmer)) { /* iterations can't be greater than k-mers */
 			opt.iterations = 1<<(2*opt.kmer);
 		}
-    }
+	}
 
-    if(args_info.file_delimiter_given) {
-        opt.file_delimiter = delimiter_to_char(args_info.file_delimiter_arg);
-    }
+	if(args_info.file_delimiter_given) {
+		opt.file_delimiter = delimiter_to_char(args_info.file_delimiter_arg);
+	}
 
-    if(args_info.independent_probs_given) {
-        opt.independent_probs = 1;
-    }
+	if(args_info.independent_probs_given) {
+		opt.independent_probs = 1;
+	}
+
+	if(args_info.motif_given) {
+		opt.motif = args_info.motif_arg;
+	}
 
 	char *filename = concat(opt.out_filename, ".dsv");
 	opt.out_file = fopen(filename, "w");
@@ -229,6 +236,8 @@ process_iteration(options *opt)
 
 		free_kmer_table(kmer_data.monomer_frq);
 		free_kmer_table(kmer_data.dimer_frq);
+	} else if(opt->motif) {
+
 	} else {
 		KmerCounter *input_counts = count_kmers(opt->input_file, opt);
 		input_table = get_frequencies(input_counts);
@@ -373,6 +382,25 @@ predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer)
 }
 
 
+void
+count_motifs(char *filename, options *opt)
+{
+	/*
+		Idea:
+		**motifs is an array of char arrays, as such to access the strings you need
+		to index 'motifs'. The kcounter structure will use these indeces as the mapping
+		to the counter, which will allow for fast lookup in the addition for multiple patterns.
+
+		Alongside this, we can use the boyer-moore algorithm to find the number of matches. We can
+		also build a regexp interpreter to handle regular expressions.
+
+		To exploit the boyer-moore, we need to modify RNA_FILE struct to include a large buffer
+		that we can search through. We can do this by having an rnaf_open function that takes
+		a buffer size parameter.
+	*/
+}
+
+
 kmerHashTable *
 get_frequencies(KmerCounter *counts)
 {
@@ -398,13 +426,12 @@ get_frequencies(KmerCounter *counts)
 kmerHashTable *
 get_enrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt)
 {
-    kmerHashTable   *enrichments_table;
     char            *key;
     double          *input_values;
     double          *bound_values;
     double          enrichment;
 
-    enrichments_table = init_kmer_table(opt->kmer, 1);
+    kmerHashTable *enrichments_table = init_kmer_table(opt->kmer, 1);
     
     // Get the log2 fold change for each kmer
     for(unsigned long i = 0; i < enrichments_table->capacity; i++) {
