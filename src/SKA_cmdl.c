@@ -49,12 +49,14 @@ const char *SKA_args_info_detailed_help[] = {
   "  -r, --iterations=INT       Set the number of iterations for SKA.\n                                 (default=`1')",
   "  ",
   "  -d, --file-delimiter=char  Set the delimiter used to separate the values in\n                               the output file.\n                                 (default=`,')",
-  "  The output of SKA by default is in csv format, meaning the values are comma\n  delimited. By specifying this option, you can change the delimiter used to\n  separate the values. The available delimiters are: comma (,), tab ('t'),\n  colon (:), vertical bar (|), and space (\" \") For example, setting\n  `--file-delimiter=\" \"' will change the delimiter to be space separated.\n  Support for other delimiters is currently unavailable.\n",
+  "  The output of SKA by default is in csv format, meaning the values are comma\n  delimited. By specifying this option, you can change the delimiter used to\n  separate the values. The available delimiters are: comma (,), tab ('t'),\n  colon (:), vertical bar (|), and space (\" \") For example, setting\n  `--file-delimiter=\" \"' will change the delimiter to be space  separated.\n  Support for other delimiters is currently unavailable.\n",
   "\nAlgorithms:",
   "  Select additional algorithms to determine the calculations.\n\n",
   "  -p, --independent-probs    Calculate the enrichments without the input reads.\n                                 (default=off)",
   "  Detailed description.\n",
-  "  -m, --motif=pattern        Search for a specific motif, rather than all\n                               k-mers.\n",
+  "      --fmotif=string        Search for a specific fixed motif, rather than all\n                               k-mers.\n",
+  "  If this option is provided, the SKA program will search for the specified\n  motif pattern. SKA will find all exact matches in the input and bound files,\n  and get the enrichment of that specific motif.\n",
+  "      --motif=pattern        Search for a specific motif, rather than all\n                               k-mers.\n",
   "  If this option is provided, then the SKA program will search for specific\n  k-mer sequences rather than all k-mers. The provided sequence can be a\n  regular expression pattern, which the program will get the iterative\n  enrichments for all k-mers that match the pattern. This option can be\n  provided more than once to match against multiple patterns.",
     0
 };
@@ -77,11 +79,12 @@ init_help_array(void)
   SKA_args_info_help[12] = SKA_args_info_detailed_help[18];
   SKA_args_info_help[13] = SKA_args_info_detailed_help[19];
   SKA_args_info_help[14] = SKA_args_info_detailed_help[21];
-  SKA_args_info_help[15] = 0; 
+  SKA_args_info_help[15] = SKA_args_info_detailed_help[23];
+  SKA_args_info_help[16] = 0; 
   
 }
 
-const char *SKA_args_info_help[16];
+const char *SKA_args_info_help[17];
 
 typedef enum {ARG_NO
   , ARG_FLAG
@@ -117,6 +120,7 @@ void clear_given (struct SKA_args_info *args_info)
   args_info->iterations_given = 0 ;
   args_info->file_delimiter_given = 0 ;
   args_info->independent_probs_given = 0 ;
+  args_info->fmotif_given = 0 ;
   args_info->motif_given = 0 ;
 }
 
@@ -137,6 +141,8 @@ void clear_args (struct SKA_args_info *args_info)
   args_info->file_delimiter_arg = gengetopt_strdup (",");
   args_info->file_delimiter_orig = NULL;
   args_info->independent_probs_flag = 0;
+  args_info->fmotif_arg = NULL;
+  args_info->fmotif_orig = NULL;
   args_info->motif_arg = NULL;
   args_info->motif_orig = NULL;
   
@@ -157,7 +163,10 @@ void init_args_info(struct SKA_args_info *args_info)
   args_info->iterations_help = SKA_args_info_detailed_help[13] ;
   args_info->file_delimiter_help = SKA_args_info_detailed_help[15] ;
   args_info->independent_probs_help = SKA_args_info_detailed_help[19] ;
-  args_info->motif_help = SKA_args_info_detailed_help[21] ;
+  args_info->fmotif_help = SKA_args_info_detailed_help[21] ;
+  args_info->fmotif_min = 0;
+  args_info->fmotif_max = 0;
+  args_info->motif_help = SKA_args_info_detailed_help[23] ;
   args_info->motif_min = 0;
   args_info->motif_max = 0;
   
@@ -316,6 +325,7 @@ SKA_cmdline_parser_release (struct SKA_args_info *args_info)
   free_string_field (&(args_info->iterations_orig));
   free_string_field (&(args_info->file_delimiter_arg));
   free_string_field (&(args_info->file_delimiter_orig));
+  free_multiple_string_field (args_info->fmotif_given, &(args_info->fmotif_arg), &(args_info->fmotif_orig));
   free_multiple_string_field (args_info->motif_given, &(args_info->motif_arg), &(args_info->motif_orig));
   
   
@@ -380,6 +390,7 @@ SKA_cmdline_parser_dump(FILE *outfile, struct SKA_args_info *args_info)
     write_into_file(outfile, "file-delimiter", args_info->file_delimiter_orig, 0);
   if (args_info->independent_probs_given)
     write_into_file(outfile, "independent-probs", 0, 0 );
+  write_multiple_into_file(outfile, args_info->fmotif_given, "fmotif", args_info->fmotif_orig, 0);
   write_multiple_into_file(outfile, args_info->motif_given, "motif", args_info->motif_orig, 0);
   
 
@@ -632,7 +643,10 @@ SKA_cmdline_parser_required2 (struct SKA_args_info *args_info, const char *prog_
   FIX_UNUSED (additional_error);
 
   /* checks for required options */
-  if (check_multiple_option_occurrences(prog_name, args_info->motif_given, args_info->motif_min, args_info->motif_max, "'--motif' ('-m')"))
+  if (check_multiple_option_occurrences(prog_name, args_info->fmotif_given, args_info->fmotif_min, args_info->fmotif_max, "'--fmotif'"))
+     error_occurred = 1;
+  
+  if (check_multiple_option_occurrences(prog_name, args_info->motif_given, args_info->motif_min, args_info->motif_max, "'--motif'"))
      error_occurred = 1;
   
   
@@ -1488,6 +1502,7 @@ SKA_cmdline_parser_internal (
 {
   int c;	/* Character of the parsed option.  */
 
+  struct generic_list * fmotif_list = NULL;
   struct generic_list * motif_list = NULL;
   int error_occurred = 0;
   struct SKA_args_info local_args_info;
@@ -1540,7 +1555,8 @@ SKA_cmdline_parser_internal (
         { "iterations",	1, NULL, 'r' },
         { "file-delimiter",	1, NULL, 'd' },
         { "independent-probs",	0, NULL, 'p' },
-        { "motif",	1, NULL, 'm' },
+        { "fmotif",	1, NULL, 0 },
+        { "motif",	1, NULL, 0 },
         { 0,  0, 0, 0 }
       };
 
@@ -1549,7 +1565,7 @@ SKA_cmdline_parser_internal (
       custom_opterr = opterr;
       custom_optopt = optopt;
 
-      c = custom_getopt_long (argc, argv, "hVi:b:o:k:r:d:pm:", long_options, &option_index);
+      c = custom_getopt_long (argc, argv, "hVi:b:o:k:r:d:p", long_options, &option_index);
 
       optarg = custom_optarg;
       optind = custom_optind;
@@ -1659,16 +1675,6 @@ SKA_cmdline_parser_internal (
             goto failure;
         
           break;
-        case 'm':	/* Search for a specific motif, rather than all k-mers.
-.  */
-        
-          if (update_multiple_arg_temp(&motif_list, 
-              &(local_args_info.motif_given), optarg, 0, 0, ARG_STRING,
-              "motif", 'm',
-              additional_error))
-            goto failure;
-        
-          break;
 
         case 0:	/* Long option with no short option */
           if (strcmp (long_options[option_index].name, "detailed-help") == 0) {
@@ -1677,6 +1683,32 @@ SKA_cmdline_parser_internal (
             exit (EXIT_SUCCESS);
           }
 
+          /* Search for a specific fixed motif, rather than all k-mers.
+.  */
+          if (strcmp (long_options[option_index].name, "fmotif") == 0)
+          {
+          
+            if (update_multiple_arg_temp(&fmotif_list, 
+                &(local_args_info.fmotif_given), optarg, 0, 0, ARG_STRING,
+                "fmotif", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          /* Search for a specific motif, rather than all k-mers.
+.  */
+          else if (strcmp (long_options[option_index].name, "motif") == 0)
+          {
+          
+            if (update_multiple_arg_temp(&motif_list, 
+                &(local_args_info.motif_given), optarg, 0, 0, ARG_STRING,
+                "motif", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          
+          break;
         case '?':	/* Invalid option.  */
           /* `getopt_long' already printed an error message.  */
           goto failure;
@@ -1688,11 +1720,17 @@ SKA_cmdline_parser_internal (
     } /* while */
 
 
+  update_multiple_arg((void *)&(args_info->fmotif_arg),
+    &(args_info->fmotif_orig), args_info->fmotif_given,
+    local_args_info.fmotif_given, 0,
+    ARG_STRING, fmotif_list);
   update_multiple_arg((void *)&(args_info->motif_arg),
     &(args_info->motif_orig), args_info->motif_given,
     local_args_info.motif_given, 0,
     ARG_STRING, motif_list);
 
+  args_info->fmotif_given += local_args_info.fmotif_given;
+  local_args_info.fmotif_given = 0;
   args_info->motif_given += local_args_info.motif_given;
   local_args_info.motif_given = 0;
   
@@ -1725,6 +1763,7 @@ SKA_cmdline_parser_internal (
   return 0;
 
 failure:
+  free_list (fmotif_list, 1 );
   free_list (motif_list, 1 );
   
   SKA_cmdline_parser_release (&local_args_info);

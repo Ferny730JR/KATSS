@@ -61,7 +61,8 @@ option "file-delimiter" d
 details="The output of SKA by default is in csv format, meaning the values are comma\
  delimited. By specifying this option, you can change the delimiter used to separate the values.\
  The available delimiters are: comma (,), tab ('t'), colon (:), vertical bar (|), and space\
- (\" \") For example, setting `--file-delimiter=\" \"' will change the delimiter to be space separated. Support for other delimiters is currently unavailable.\n"
+ (\" \") For example, setting `--file-delimiter=\" \"' will change the delimiter to be space \
+ separated. Support for other delimiters is currently unavailable.\n"
 string
 typestr="char"
 default=","
@@ -77,7 +78,17 @@ details="Detailed description.\n"
 flag
 off
 
-option "motif" m
+option "fmotif" -
+"Search for a specific fixed motif, rather than all k-mers.\n"
+details="If this option is provided, the SKA program will search for the specified motif pattern.\
+ SKA will find all exact matches in the input and bound files, and get the enrichment of that specific\
+ motif.\n"
+string
+typestr="string"
+optional
+multiple
+
+option "motif" -
 "Search for a specific motif, rather than all k-mers.\n"
 details="If this option is provided, then the SKA program will search for specific k-mer sequences\
  rather than all k-mers. The provided sequence can be a regular expression pattern, which the\
