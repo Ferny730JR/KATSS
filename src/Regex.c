@@ -48,6 +48,10 @@ static void resolveCharacterClass(RegexCompiler *regexCompiler, const char *patt
 static void resolveQuantification(RegexCompiler *regexCompiler, const char *pattern);
 static inline void setRegularChar(RegexCompiler *regexCompiler, char charInPattern);
 
+static void resolveMatcherCluster(Matcher *matcher, Regex *regex);
+static void resolveClusterStartIndex(Matcher *matcher);
+static void clusterDefault(Matcher *matcher);
+
 static bool matchPattern(RegexNode *regex, Matcher *matcher, const char *text);
 static bool matchQuestionMark(RegexNode *regex, RegexNode *pattern, const char *text, Matcher *matcher);
 static bool matchQuantifier(RegexNode *regex, RegexNode *pattern, const char *text, Matcher *matcher);
@@ -129,11 +133,14 @@ void regexCompile(Regex *regex, const char *pattern) {
 }
 
 Matcher regexMatch(Regex *regex, const char *text) {
-    Matcher matcher = {.foundAtIndex = 0, .matchLength = 0, .isFound = false};
+    Matcher matcher = {.foundAtIndex = 0, .matchLength = 0, .isFound = false, .__clusterIndex = 0};
     if (regex == NULL || !regex->isPatternValid) return matcher;
+	
+	resolveMatcherCluster(&matcher, regex);
 
     if (regex->compiledRegexArray[0].patternType == REGEX_BEGIN) {
         matcher.isFound = matchPattern(regex->compiledRegexArray + 1, &matcher, text);
+		resolveClusterStartIndex(&matcher);
         return matcher;
     }
 
@@ -144,15 +151,97 @@ Matcher regexMatch(Regex *regex, const char *text) {
                 return matcher;
             }
             matcher.isFound = true;
+			resolveClusterStartIndex(&matcher);
             return matcher;
         }
         matcher.foundAtIndex++;
-		matcher.matchLength=0;	// bug: when shifting search index, it would carry over length
+		matcher.matchLength = 0;	// bug: when shifting search index, it would carry over length
+		matcher.__clusterIndex = 0;
     } while (*text++ != END_LINE);
 
     return matcher;
 }
 
+
+static void resolveMatcherCluster(Matcher *matcher, Regex *regex) {
+	uint8_t regexIndex = 0, clusterIndex = 0;
+	while(regex->compiledRegexArray[regexIndex].patternType != REGEX_END_OF_PATTERN) {
+		switch(regex->compiledRegexArray[regexIndex].patternType) {
+			case REGEX_REGULAR_CHAR:
+				matcher->cluster[clusterIndex].clusterLength = 0;
+				matcher->cluster[clusterIndex].binType = REGEX_REGULAR_CHAR;
+				matcher->cluster[clusterIndex].startIndex = 0;
+				clusterIndex++;
+				break;
+			case REGEX_DOT:
+				matcher->cluster[clusterIndex].clusterLength = 0;
+				matcher->cluster[clusterIndex].binType = REGEX_DOT;
+				matcher->cluster[clusterIndex].startIndex = 0;
+				clusterIndex++;
+				break;
+			case REGEX_ALPHA:
+				matcher->cluster[clusterIndex].clusterLength = 0;
+				matcher->cluster[clusterIndex].binType = REGEX_ALPHA;
+				matcher->cluster[clusterIndex].startIndex = 0;
+				clusterIndex++;
+				break;
+			case REGEX_NOT_ALPHA: 
+				matcher->cluster[clusterIndex].clusterLength = 0;
+				matcher->cluster[clusterIndex].binType = REGEX_NOT_ALPHA;
+				matcher->cluster[clusterIndex].startIndex = 0;
+				clusterIndex++;
+				break;
+			case REGEX_CHAR_CLASS: 
+				matcher->cluster[clusterIndex].clusterLength = 0;
+				matcher->cluster[clusterIndex].binType = REGEX_CHAR_CLASS;
+				matcher->cluster[clusterIndex].startIndex = 0;
+				clusterIndex++;
+				break;
+			case REGEX_INVERSE_CHAR_CLASS: 
+				matcher->cluster[clusterIndex].clusterLength = 0;
+				matcher->cluster[clusterIndex].binType = REGEX_INVERSE_CHAR_CLASS;
+				matcher->cluster[clusterIndex].startIndex = 0;
+				clusterIndex++;
+				break;
+			case REGEX_DIGIT: 
+				matcher->cluster[clusterIndex].clusterLength = 0;
+				matcher->cluster[clusterIndex].binType = REGEX_DIGIT;
+				matcher->cluster[clusterIndex].startIndex = 0;
+				clusterIndex++;
+				break;
+			case REGEX_NOT_DIGIT: 
+				matcher->cluster[clusterIndex].clusterLength = 0;
+				matcher->cluster[clusterIndex].binType = REGEX_NOT_DIGIT;
+				matcher->cluster[clusterIndex].startIndex = 0;
+				clusterIndex++;
+				break;
+			case REGEX_WHITESPACE: 
+				matcher->cluster[clusterIndex].clusterLength = 0;
+				matcher->cluster[clusterIndex].binType = REGEX_WHITESPACE;
+				matcher->cluster[clusterIndex].startIndex = 0;
+				clusterIndex++;
+				break;
+			case REGEX_NOT_WHITESPACE: 
+				matcher->cluster[clusterIndex].clusterLength = 0;
+				matcher->cluster[clusterIndex].binType = REGEX_NOT_WHITESPACE;
+				matcher->cluster[clusterIndex].startIndex = 0;
+				clusterIndex++;
+				break;
+			default: break; // do nothing
+		}
+		regexIndex++;
+	}
+	matcher->cluster[clusterIndex].binType = REGEX_END_OF_PATTERN;
+}
+
+static void resolveClusterStartIndex(Matcher *matcher) {
+	int32_t clusterIndex = 0, startIndex = matcher->foundAtIndex;
+	while(matcher->cluster[clusterIndex].binType != REGEX_END_OF_PATTERN) {
+		matcher->cluster[clusterIndex].startIndex = startIndex;
+		startIndex += matcher->cluster[clusterIndex].clusterLength;
+		clusterIndex++;
+	}
+}
 
 static inline void setBeginMetaChar(RegexCompiler *regexCompiler) {
     regexCompiler->isQuantifiable = false;
@@ -387,6 +476,7 @@ static inline void setRegularChar(RegexCompiler *regexCompiler, char charInPatte
 
 static bool matchPattern(RegexNode *regex, Matcher *matcher, const char *text) {
     int32_t previousMatch = matcher->matchLength;
+	uint16_t previousCluster = matcher->__clusterIndex;
 
     do {
 		if(regex[0].patternType == REGEX_END_OF_PATTERN) {
@@ -402,15 +492,24 @@ static bool matchPattern(RegexNode *regex, Matcher *matcher, const char *text) {
 				case REGEX_LAZY_STAR: return matchStarLazy(regex, (regex + 2), text, matcher);
 				case REGEX_PLUS: return matchPlus(regex, (regex + 2), text, matcher);
 				case REGEX_LAZY_PLUS: return matchPlusLazy(regex, (regex + 2), text, matcher);
-				default: matcher->matchLength++;
+				default: 
+					matcher->matchLength++;
+					clusterDefault(matcher);
+					break;
 			}
 		}
     } while (text[0] != END_LINE && matchOne(regex++, *text++));
 
     matcher->matchLength = previousMatch;
+	matcher->__clusterIndex = previousCluster;
     return false;
 }
 
+
+static void clusterDefault(Matcher *matcher) {
+	matcher->cluster[matcher->__clusterIndex].clusterLength = 1;
+	matcher->__clusterIndex++;
+}
 
 static bool matchQuestionMark(RegexNode *regex, RegexNode *pattern, const char *text, Matcher *matcher) {
     if (regex->patternType == REGEX_END_OF_PATTERN || matchPattern(pattern, matcher, text)) {
@@ -428,6 +527,7 @@ static bool matchQuestionMark(RegexNode *regex, RegexNode *pattern, const char *
 
 static bool matchQuantifier(RegexNode *regex, RegexNode *pattern, const char *text, Matcher *matcher) {
     int32_t preLength = matcher->matchLength;
+	uint16_t previousCluster = matcher->__clusterIndex;
     uint16_t minQuantifier = pattern->minMaxQuantifiers[0];
     int32_t maxQuantifier = pattern->minMaxQuantifiers[1] - minQuantifier;
 	int32_t iters=0;
@@ -440,13 +540,17 @@ static bool matchQuantifier(RegexNode *regex, RegexNode *pattern, const char *te
     }
 
     if (minQuantifier > 0) {
+		matcher->cluster[matcher->__clusterIndex].clusterLength = 0;
         return false;
     }
 
     do {
+		matcher->__clusterIndex=previousCluster+1;
         if (matchPattern(pattern + 1, matcher, text)) {
+			matcher->cluster[previousCluster].clusterLength = iters;
             return true;
         }
+		matcher->__clusterIndex=previousCluster;
         iters++;
 		matcher->matchLength=preLength+iters;
     } while (text[0] != END_LINE && maxQuantifier-- > 0 && matchOne(regex, *text++));
