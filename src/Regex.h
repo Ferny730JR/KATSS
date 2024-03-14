@@ -96,7 +96,15 @@ typedef struct Regex {
     char *errorMessage;
 } Regex;
 
+typedef struct MatcherCluster {
+	RegexPatternType binType;
+	int32_t startIndex;
+	int32_t clusterLength;
+} MatcherCluster;
+
 typedef struct Matcher {
+	struct MatcherCluster cluster[MAX_REGEXP_OBJECTS];
+	uint16_t __clusterIndex;
     int32_t foundAtIndex;
     int32_t matchLength;
     bool isFound;
