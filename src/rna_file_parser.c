@@ -9,25 +9,25 @@
 #define NO_OF_CHARS 256
 
 /* Function declarations */
+static void
+parse_fasta(RNA_FILE *rna_file, char **ret_seq);
 
-void parse_fasta(RNA_FILE *rna_file, char **ret_seq);
+static void
+parse_fastq(RNA_FILE *rna_file, char **ret_seq);
 
-void parse_fastq(RNA_FILE *rna_file, char **ret_seq);
+static void
+parse_reads(RNA_FILE *rna_file, char **ret_seq);
 
-void parse_reads(RNA_FILE *rna_file, char **ret_seq);
+static char
+determine_filetype(char peek);
 
-char determine_filetype(char peek);
+static int
+is_nucleotide(char character);
 
-int is_nucleotide(char character);
+static int
+is_full(char *buffer, int buffer_size);
 
-int is_full(char *buffer, int buffer_size);
-
-int max(int a, int b);
-
-void 
-rnaf_read(RNA_FILE *rna_file, unsigned int offset);
-
-void 
+static void
 badCharHeuristic(const char* str, int size, int badchar[NO_OF_CHARS]);
 
 
@@ -35,7 +35,9 @@ badCharHeuristic(const char* str, int size, int badchar[NO_OF_CHARS]);
 #  Main Functions (Used in header)                         #
 ##########################################################*/
 
-RNA_FILE *rnaf_open(char* filename) {
+RNA_FILE *
+rnaf_open(char* filename) 
+{
 	RNA_FILE *rna_file = s_malloc(sizeof *rna_file);
 	rna_file->file = fopen(filename, "r");
 	rna_file->buffer = s_malloc(MAX_SEQ_LENGTH * sizeof(char));
@@ -44,15 +46,16 @@ RNA_FILE *rnaf_open(char* filename) {
 
 	/* Check if we can open file for reading */
 	if( (rna_file->file) == NULL ) {
+		free(rna_file->buffer);
 		free(rna_file);
 		error_message("Failed to open file '%s'",filename);
 		return NULL;
 	}
 
 	/* Check if file contains a valid line */
-	rna_file->end_of_file = fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file);
-	if(rna_file->end_of_file == NULL) { 
+	if(!fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file)) { 
 		fclose(rna_file->file);
+		free(rna_file->buffer);
 		free(rna_file);
 		warning_message("File '%s' contains no sequences.",filename);
 		return NULL;
@@ -61,11 +64,18 @@ RNA_FILE *rnaf_open(char* filename) {
 	/* Determine what type of file was passed */
 	rna_file->filetype = determine_filetype(rna_file->buffer[0]);
 
+	/* Reset the file to read from beginning */
+	if(rna_file->filetype == 'r') {
+		rewind(rna_file->file);
+	}
+
 	return rna_file;
 }
 
 
-char *rnaf_get(RNA_FILE *rna_file) {
+char *
+rnaf_get(RNA_FILE *rna_file) 
+{
 	char *seq = NULL;
 
 	/* Check the type of file format */
@@ -83,7 +93,30 @@ char *rnaf_get(RNA_FILE *rna_file) {
 }
 
 
-void rnaf_close(RNA_FILE *rna_file) {
+void 
+rnaf_oread(RNA_FILE *rna_file, unsigned int offset)
+{
+	for(unsigned int i=0; i<offset; i++) {
+		unsigned int indx = rna_file->buffer_size-(offset-i);
+		rna_file->buffer[i] = rna_file->buffer[indx];
+	}
+
+	unsigned int len, ret;
+	len = rna_file->buffer_size - offset;
+	ret = fread(rna_file->buffer+offset, 1, len, rna_file->file);
+
+	if(len == ret) {
+		return;
+	}
+	for(unsigned int i=offset+ret; i<rna_file->buffer_size; i++) {
+		rna_file->buffer[i] = '\0';
+	}
+}
+
+
+void 
+rnaf_close(RNA_FILE *rna_file) 
+{
 	fclose(rna_file->file);
 	free(rna_file->buffer);
 	free(rna_file);
@@ -129,7 +162,7 @@ rnaf_search(RNA_FILE *rna_file, const char *sequence)
 		}
 
 		else {
-			s += max(1, j - badchar[rna_file->buffer[s + j]]);
+			s += MAX2(1, j - badchar[rna_file->buffer[s + j]]);
 		}
 	}
 
@@ -141,149 +174,133 @@ rnaf_search(RNA_FILE *rna_file, const char *sequence)
 #  Helper Functions                                        #
 ##########################################################*/
 
-void parse_fasta(RNA_FILE *rna_file, char **ret_seq) {
-    char    *seq;
+static void
+parse_fasta(RNA_FILE *rna_file, char **ret_seq) 
+{   /* Init seq, will be realloc'd based on input stream */
+	char    *seq = NULL;
 
-    /* Init seq, will be realloc'd based on input stream */
-    seq = NULL;
-    while (fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file)) { 
-        if (rna_file->buffer[0] == '>') {
-            break;      /* New sequence, so break */
-        }
+	while (fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file)) { 
+		if (rna_file->buffer[0] == '>') {
+			break;      /* New sequence, so break */
+		}
 
-        /* Append sequence found in buffer into seq variable */
-        append(&seq, rna_file->buffer);
-    }
-
-    /* Have ret_seq point to new seq */
-    *ret_seq = seq;
-}
-
-
-void parse_fastq(RNA_FILE *rna_file, char **ret_seq) {
-    char            *seq;
-    unsigned int    reading_seq = 1;
-
-    /* Init seq, will be realloc'd based on input stream */
-    seq = NULL;
-    while(fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file)) {
-        if(rna_file->buffer[0] == '@' ) {
-            break;  /* New sequence, so break */
-        }
-
-        if ( rna_file->buffer[0] == '+' ) {
-            reading_seq = 0;
-            continue;   /* Reading from metadata, so skip iteration */
-        }
-
-        /* Append sequence found in buffer into seq variable */
-        if(reading_seq) {
-            append(&seq, rna_file->buffer);
-        }
-    }
-
-    /* Have ret_seq point to new seq */
-    *ret_seq = seq;
-}
-
-
-void parse_reads(RNA_FILE *rna_file, char **ret_seq) {
-    char    *seq;
-
-    seq = NULL;
-    append(&seq, rna_file->buffer);
-
-    /* If buffer was not large enough to store sequence, keep reading */
-    while(is_full(rna_file->buffer, MAX_SEQ_LENGTH)) {
-        memset(&rna_file->buffer[0], 0, MAX_SEQ_LENGTH);
-        fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file);
-        append(&seq, rna_file->buffer);
-    }
-    
-    /* If EOF has not been reached, return seq and read next line */
-    if(rna_file->end_of_file) {
-        *ret_seq = seq;
-        rna_file->end_of_file = fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file);
-    } else {
-        free(seq);  /* EOF, so free seq */
-    }
-}
-
-
-char determine_filetype(char peek) {
-    char ret;
-
-    if( is_nucleotide(peek) ) {
-        ret = 'r';  /* reads file */
-    } else if(peek == '@') {
-        ret = 'q';  /* fastq file */
-    } else if(peek == '>') {
-        ret = 'a';  /* fasta file */
-    } else {
-        ret = '\0'; /* unsupported file type */
-    }
-
-    return ret;
-}
-
-
-int is_nucleotide(char character) {
-    int ret;
-
-    switch(character) {
-        case 'A':   ret = 1;    break;
-        case 'a':   ret = 1;    break;
-        case 'C':   ret = 1;    break;
-        case 'c':   ret = 1;    break;
-        case 'G':   ret = 1;    break;
-        case 'g':   ret = 1;    break;
-        case 'T':   ret = 1;    break;
-        case 't':   ret = 1;    break;
-        case 'U':   ret = 1;    break;
-        case 'u':   ret = 1;    break;
-        default:    ret = 0;    break;
-    }
-
-    return ret;
-}
-
-
-int is_full(char *buffer, int buffer_size) {
-    int ret=0;
-
-    if( buffer[buffer_size-1] == '\0' && is_nucleotide(buffer[buffer_size-2]) ) { // full
-        ret=1;
-    }
-
-    return ret;
-}
-
-
-void 
-rnaf_read(RNA_FILE *rna_file, unsigned int offset)
-{
-	for(unsigned int i=0; i<offset; i++) {
-		unsigned int indx = rna_file->buffer_size-(offset-i);
-		rna_file->buffer[i] = rna_file->buffer[indx];
+		/* Append sequence found in buffer into seq variable */
+		append(&seq, rna_file->buffer);
 	}
 
-	unsigned int len, ret;
-	len = rna_file->buffer_size - offset;
-	ret = fread(rna_file->buffer+offset, 1, len, rna_file->file);
+	/* Have ret_seq point to new seq */
+	*ret_seq = seq;
+}
 
-	if(len == ret) {
+
+static void
+parse_fastq(RNA_FILE *rna_file, char **ret_seq) 
+{
+	char            *seq = NULL; /* Init seq, will be realloc'd based on input stream */
+	unsigned int    reading_seq = 1;
+
+	while(fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file)) {
+		if(rna_file->buffer[0] == '@' ) {
+			break;  /* New sequence, so break */
+		}
+
+		if ( rna_file->buffer[0] == '+' ) {
+			reading_seq = 0;
+			continue;   /* Reading from metadata, so skip iteration */
+		}
+
+		/* Append sequence found in buffer into seq variable */
+		if(reading_seq) {
+			append(&seq, rna_file->buffer);
+		}
+	}
+
+	/* Have ret_seq point to new seq */
+	*ret_seq = seq;
+}
+
+
+static void
+parse_reads(RNA_FILE *rna_file, char **ret_seq) 
+{
+	char *seq = NULL;
+
+	/* Get next line, and if NULL, return */
+	if(!fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file)) {
 		return;
 	}
-	for(unsigned int i=offset+ret; i<rna_file->buffer_size; i++) {
-		rna_file->buffer[i] = '\0';
+
+	/* Append the read file to seq */
+	append(&seq, rna_file->buffer);
+
+	/* If buffer was not large enough to store sequence, keep reading */
+	while(is_full(rna_file->buffer, rna_file->buffer_size)) {
+		memset(rna_file->buffer, 0, rna_file->buffer_size*sizeof(char));
+		fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file);
+		append(&seq, rna_file->buffer);
 	}
+
+	/* Have ret_seq point to new seq */
+	*ret_seq = seq;
 }
- 
-// A utility function to get maximum of two integers
-int max(int a, int b) { return (a > b) ? a : b; }
- 
-// The preprocessing function for Boyer Moore's
-// bad character heuristic
+
+
+static char
+determine_filetype(char peek) 
+{
+	char ret;
+
+	if( is_nucleotide(peek) ) {
+		ret = 'r';  /* reads file */
+	} else if(peek == '@') {
+		ret = 'q';  /* fastq file */
+	} else if(peek == '>') {
+		ret = 'a';  /* fasta file */
+	} else {
+		ret = '\0'; /* unsupported file type */
+	}
+
+	return ret;
+}
+
+
+static int
+is_nucleotide(char character) 
+{
+	int ret;
+
+	switch(character) {
+		case 'A':   ret = 1;    break;
+		case 'a':   ret = 1;    break;
+		case 'C':   ret = 1;    break;
+		case 'c':   ret = 1;    break;
+		case 'G':   ret = 1;    break;
+		case 'g':   ret = 1;    break;
+		case 'T':   ret = 1;    break;
+		case 't':   ret = 1;    break;
+		case 'U':   ret = 1;    break;
+		case 'u':   ret = 1;    break;
+		default:    ret = 0;    break;
+	}
+
+	return ret;
+}
+
+
+int 
+is_full(char *buffer, int buffer_size) 
+{
+	int ret=0;
+
+	if( buffer[buffer_size-1] == '\0' && is_nucleotide(buffer[buffer_size-2]) ) { // full
+		ret=1;
+	}
+
+	return ret;
+}
+
+
+// The preprocessing function for Boyer Moore's bad character heuristic
 void 
 badCharHeuristic(const char* str, int size, int badchar[NO_OF_CHARS])
 {
