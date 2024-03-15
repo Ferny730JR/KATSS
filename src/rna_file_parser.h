@@ -13,7 +13,6 @@ typedef struct RNA_FILE {
     FILE *file;                     /** File pointer for the RNA file. */
     char *buffer;                   /** Character buffer to store sequence data. */
 	unsigned int buffer_size;       /** Int to store the size of the buffer */
-    char *end_of_file;              /** Pointer to the end of the file indicator. */
     char filetype;                  /** Character to store which file type was passed. */
 } RNA_FILE;
 
@@ -50,6 +49,19 @@ char *rnaf_get(RNA_FILE *rna_file);
 
 
 /**
+ *  @brief Read from the file until buffer is full.
+ * 
+ *  Fills the first offset number of characters of the buffer with the last offset
+ *  number of characters of the previous buffer. After which, the rest of the buffer is filled
+ *  with the new reads.
+ * 
+ *  @param rna_file A pointer to the RNA_FILE struct representing the opened file
+ *  @param offset The number of characters to read from the previous buffer
+*/
+void rnaf_oread(RNA_FILE *rna_file, unsigned int offset);
+
+
+/**
  *  @brief Closes the RNA file.
  *
  *  This function closes the RNA file represented by the provided RNA_FILE struct and frees
@@ -77,8 +89,5 @@ rnaf_rebuff(RNA_FILE *rna_file, unsigned int size);
 */
 unsigned int
 rnaf_search(RNA_FILE *rna_file, const char *sequence);
-
-
-void rnaf_read(RNA_FILE *rna_file, unsigned int offset);
 
 #endif // FILE_PARSER
