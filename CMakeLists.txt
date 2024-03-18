@@ -27,6 +27,7 @@ add_executable(SKA
     src/utils.c
     src/parallel_helpers.c
     src/c_thread_pool/thpool.c
+	src/Regex.c
     src/SKA_cmdl.c)
 
 # Include directories for SKA
