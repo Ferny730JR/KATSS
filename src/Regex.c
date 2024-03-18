@@ -24,6 +24,7 @@ SOFTWARE.
 #include <stdlib.h>
 #include "Regex.h"
 #include "string_utils.h"
+#include "utils.h"
 
 #define END_LINE '\0'
 #define MAX_QUANTIFICATION_VALUE  1024  // Max in {M,N} - Denotes the minimum M and the maximum N regexMatch count.
@@ -52,6 +53,12 @@ static void resolveMatcherCluster(Matcher *matcher, Regex *regex);
 static void resolveClusterStartIndex(Matcher *matcher);
 static void clusterDefault(Matcher *matcher);
 
+RegexCluster *regexClusterInit(Regex *regex);
+static void initBin(RegexCluster *regexCluster, uint32_t bin, uint32_t min, uint32_t max);
+static void initBinPos(RegexCluster *regexCluster, uint32_t length, uint8_t bin);
+static void initLenPos(RegexCluster *regexCluster, uint32_t length, uint8_t bin, uint32_t pos);
+static bool isQuantifier(RegexPatternType patternType);
+
 static bool matchPattern(RegexNode *regex, Matcher *matcher, const char *text);
 static bool matchQuestionMark(RegexNode *regex, RegexNode *pattern, const char *text, Matcher *matcher);
 static bool matchQuantifier(RegexNode *regex, RegexNode *pattern, const char *text, Matcher *matcher);
@@ -67,6 +74,13 @@ static inline bool isMatchingDot(unsigned char character);
 static bool matchCharClass(unsigned char character, const unsigned char *metaCharString);
 static inline bool isMatchingRange(unsigned char character, const unsigned char *string);
 static bool isMatchingMetaChar(unsigned char character, const unsigned char *metaCharString);
+
+void
+reclustAddNT(RegexCluster *regexCluster, char nucleotide, uint8_t bin, uint32_t len, uint32_t pos);
+uint32_t 
+reclustGetNT(RegexCluster *regexCluster, char nucleotide, uint8_t bin, uint32_t len, uint32_t pos);
+uint32_t reclustGetLenTotal(RegexCluster *regexCluster, uint8_t bin, uint32_t len);
+uint32_t reclustGetBinTotal(RegexCluster *regexCluster, uint8_t bin);
 
 
 void regexCompile(Regex *regex, const char *pattern) {
@@ -160,6 +174,101 @@ Matcher regexMatch(Regex *regex, const char *text) {
     } while (*text++ != END_LINE);
 
     return matcher;
+}
+
+RegexCluster *regexClusterInit(Regex *regex) {
+	RegexCluster *regexCluster = s_malloc(sizeof *regexCluster);
+	regexCluster->num_bins = 0;
+
+	RegexNode *re_node = regex->compiledRegexArray;
+
+	/* Find the number of bins in regexCluster */
+	uint8_t regexIndex = 0;
+	while(regex->compiledRegexArray[regexIndex].patternType != REGEX_END_OF_PATTERN) {
+		if(isQuantifier(regex->compiledRegexArray[regexIndex].patternType)) {
+			regexCluster->num_bins++;
+		}
+		regexIndex++;
+	}
+
+	/* Init the bins in cluster */
+	regexCluster->bin = s_malloc(regexCluster->num_bins * sizeof *regexCluster->bin);
+
+	/* Init the length and positional information in cluster */
+	uint8_t binIndex = 0;
+	do {
+		if(re_node[0].patternType == REGEX_END_OF_PATTERN) {
+			break;
+
+		} else if(re_node[1].patternType == REGEX_QUESTION_MARK) {
+			initBin(regexCluster, binIndex, 0, 1);
+			binIndex++;
+
+		} else if(re_node[1].patternType == REGEX_QUANTIFIER) {
+			initBin(regexCluster, binIndex, re_node[1].minMaxQuantifiers[0], 
+			  re_node[1].minMaxQuantifiers[1]);
+			binIndex++;
+		
+		} else if(re_node[1].patternType == REGEX_STAR) {
+			// todo
+		} else if(re_node[1].patternType == REGEX_LAZY_STAR) {
+			// todo
+		} else if(re_node[1].patternType == REGEX_PLUS) {
+			// todo
+		} else if(re_node[1].patternType == REGEX_LAZY_PLUS) {
+			// todo
+		} else if(isQuantifier(re_node[0].patternType)) {
+			initBin(regexCluster, binIndex, 1, 1);
+			binIndex++;
+		}
+	} while(re_node++);
+
+	return regexCluster;
+}
+
+static void initBin(RegexCluster *regexCluster, uint32_t bin, uint32_t min, uint32_t max) {
+	regexCluster->bin[bin].total = 0;
+	regexCluster->bin[bin].maxLen = max ? max : min;
+	regexCluster->bin[bin].minLen = min;
+
+	uint32_t length = max ? (max-min)+1 : min;
+
+	initBinPos(regexCluster, length, bin);
+}
+
+static void initBinPos(RegexCluster *regexCluster, uint32_t length, uint8_t bin) {
+	regexCluster->bin[bin].len = s_malloc(length * sizeof(BinsLenInfo));
+	for(uint32_t i = 0; i < length; i++) {
+		regexCluster->bin[bin].len[i].total = 0;
+		initLenPos(regexCluster, regexCluster->bin[bin].minLen+i, bin, i);
+	}
+}
+
+static void initLenPos(RegexCluster *regexCluster, uint32_t length, uint8_t bin, uint32_t pos) {
+	regexCluster->bin[bin].len[pos].pos = s_malloc(length * sizeof(LenPosInfo));
+	for(uint32_t i = 0; i < length; i++) {
+		regexCluster->bin[bin].len[pos].pos[length].A = 0;
+		regexCluster->bin[bin].len[pos].pos[length].C = 0;
+		regexCluster->bin[bin].len[pos].pos[length].G = 0;
+		regexCluster->bin[bin].len[pos].pos[length].T = 0;
+	}
+}
+
+static bool isQuantifier(RegexPatternType patternType) {
+	switch(patternType) {
+		case REGEX_REGULAR_CHAR:        return true;
+		case REGEX_DOT:                 return true;
+		case REGEX_ALPHA:               return true;
+		case REGEX_NOT_ALPHA:           return true;
+		case REGEX_CHAR_CLASS:          return true;
+		case REGEX_INVERSE_CHAR_CLASS:  return true;
+		case REGEX_DIGIT:               return true;
+		case REGEX_NOT_DIGIT:           return true;
+		case REGEX_WHITESPACE:          return true;
+		case REGEX_NOT_WHITESPACE:      return true;
+		default: 
+			return false;
+	}
 }
 
 
@@ -703,4 +812,92 @@ static bool isMatchingMetaChar(unsigned char character, const unsigned char *met
         default:
             return (character == metaChar);
     }
+}
+
+void 
+reclustAddNT(RegexCluster *regexCluster, char nucleotide, uint8_t bin, uint32_t len, uint32_t pos)
+{
+	if(bin>regexCluster->num_bins) {
+		return;
+	}
+
+	/* Add one to current bin total */
+	regexCluster->bin[bin].total++;
+
+	/* Get the len index from len parameter */
+	len = len - regexCluster->bin[bin].minLen;
+
+	if(len < 0 || len > (regexCluster->bin[bin].maxLen - regexCluster->bin[bin].minLen)) {
+		error_message("len (%d) for cluster %d not within range: (%d-%d)",
+		 bin, len, regexCluster->bin[bin].minLen, regexCluster->bin[bin].maxLen);
+	}
+
+	/* Add one to provided length NT and total */
+	switch(nucleotide) {
+		case 'A':
+			regexCluster->bin[bin].len[len].pos[pos].A++;
+			regexCluster->bin[bin].len[len].total++; break;
+		case 'C':
+			regexCluster->bin[bin].len[len].pos[pos].C++;
+			regexCluster->bin[bin].len[len].total++; break;
+		case 'G':
+			regexCluster->bin[bin].len[len].pos[pos].G++;
+			regexCluster->bin[bin].len[len].total++; 
+			break;
+		case 'T':
+			regexCluster->bin[bin].len[len].pos[pos].T++;
+			regexCluster->bin[bin].len[len].total++; break;
+		case 'U':
+			regexCluster->bin[bin].len[len].pos[pos].T++;
+			regexCluster->bin[bin].len[len].total++; break;
+		default:
+			error_message("FAILED TO ADD NUCLEOTIDE '%c' TO BIN %d", nucleotide, bin);
+	}
+}
+
+uint32_t reclustGetNT(RegexCluster *regexCluster, char nucleotide,
+                      uint8_t bin, uint32_t len, uint32_t pos) {
+	if(bin>regexCluster->num_bins) {
+		return 0;
+	}
+	switch(nucleotide) {
+		case 'A': return regexCluster->bin[bin].len[len].pos[pos].A;
+		case 'C': return regexCluster->bin[bin].len[len].pos[pos].C;
+		case 'G': return regexCluster->bin[bin].len[len].pos[pos].G;
+		case 'T': return regexCluster->bin[bin].len[len].pos[pos].T;
+		case 'U': return regexCluster->bin[bin].len[len].pos[pos].T;
+		default:
+			error_message("FAILED TO GET NUCLEOTIDE '%c' FROM BIN %d", nucleotide, bin);
+			return 0;
+	}
+}
+
+uint32_t reclustGetLenTotal(RegexCluster *regexCluster, uint8_t bin, uint32_t len) {
+	if(bin > regexCluster->num_bins) {
+		return 0;
+	}
+	return regexCluster->bin[bin].len[len].total;
+}
+
+uint32_t reclustGetBinTotal(RegexCluster *regexCluster, uint8_t bin) {
+	if(bin > regexCluster->num_bins) {
+		return 0;
+	}
+	return regexCluster->bin[bin].total;
+}
+
+static void freeBin(RegexBins *bin) {
+	int num_lens = (bin->maxLen - bin->minLen) + 1;
+	for(int len=0; len < num_lens; len++) {
+		free(bin->len[len].pos);
+	}
+	free(bin->len);
+}
+
+void freeRegexCluster(RegexCluster *regexCluster) {
+	for(int i=0; i<regexCluster->num_bins; i++) {
+		freeBin(&regexCluster->bin[i]);
+	}
+	free(regexCluster->bin);
+	free(regexCluster);
 }
