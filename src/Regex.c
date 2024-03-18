@@ -515,7 +515,9 @@ static void resolveQuantification(RegexCompiler *regexCompiler, const char *patt
             }
             regexCompiler->regex->compiledRegexArray[regexCompiler->regexIndex].minMaxQuantifiers[1] = maxQuantifierValue;
         }
-    }
+    } else if(pattern[regexCompiler->patternIndex] == '}') { // seriously? You didn't initialize the max value? Come on...
+		regexCompiler->regex->compiledRegexArray[regexCompiler->regexIndex].minMaxQuantifiers[1] = 0;
+	}
 
     setRegexPatternType(REGEX_QUANTIFIER, regexCompiler);
 }
