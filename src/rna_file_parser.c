@@ -148,7 +148,7 @@ rnaf_search(RNA_FILE *rna_file, const char *sequence)
 	int badchar[NO_OF_CHARS];
 	badCharHeuristic(sequence, m, badchar);
 
-	int s = 0;
+	unsigned int s = 0;
 	while (s <= (n - m)) {
 		int j = m - 1;
 
@@ -159,11 +159,11 @@ rnaf_search(RNA_FILE *rna_file, const char *sequence)
 		if (j < 0) {
 			// printf("pattern occurs at shift = %d\n", s);
 			counts++;
-			s += (s + m < n) ? m - badchar[rna_file->buffer[s + m]] : 1;
+			s += (s + m < n) ? m - badchar[(uint8_t)rna_file->buffer[s + m]] : 1;
 		}
 
 		else {
-			s += MAX2(1, j - badchar[rna_file->buffer[s + j]]);
+			s += MAX2(1, j - badchar[(uint8_t)rna_file->buffer[s + j]]);
 		}
 	}
 
