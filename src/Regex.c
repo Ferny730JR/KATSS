@@ -275,77 +275,20 @@ static bool isQuantifier(RegexPatternType patternType) {
 static void resolveMatcherCluster(Matcher *matcher, Regex *regex) {
 	uint8_t regexIndex = 0, clusterIndex = 0;
 	while(regex->compiledRegexArray[regexIndex].patternType != REGEX_END_OF_PATTERN) {
-		switch(regex->compiledRegexArray[regexIndex].patternType) {
-			case REGEX_REGULAR_CHAR:
-				matcher->cluster[clusterIndex].clusterLength = 0;
-				matcher->cluster[clusterIndex].binType = REGEX_REGULAR_CHAR;
-				matcher->cluster[clusterIndex].startIndex = 0;
-				clusterIndex++;
-				break;
-			case REGEX_DOT:
-				matcher->cluster[clusterIndex].clusterLength = 0;
-				matcher->cluster[clusterIndex].binType = REGEX_DOT;
-				matcher->cluster[clusterIndex].startIndex = 0;
-				clusterIndex++;
-				break;
-			case REGEX_ALPHA:
-				matcher->cluster[clusterIndex].clusterLength = 0;
-				matcher->cluster[clusterIndex].binType = REGEX_ALPHA;
-				matcher->cluster[clusterIndex].startIndex = 0;
-				clusterIndex++;
-				break;
-			case REGEX_NOT_ALPHA: 
-				matcher->cluster[clusterIndex].clusterLength = 0;
-				matcher->cluster[clusterIndex].binType = REGEX_NOT_ALPHA;
-				matcher->cluster[clusterIndex].startIndex = 0;
-				clusterIndex++;
-				break;
-			case REGEX_CHAR_CLASS: 
-				matcher->cluster[clusterIndex].clusterLength = 0;
-				matcher->cluster[clusterIndex].binType = REGEX_CHAR_CLASS;
-				matcher->cluster[clusterIndex].startIndex = 0;
-				clusterIndex++;
-				break;
-			case REGEX_INVERSE_CHAR_CLASS: 
-				matcher->cluster[clusterIndex].clusterLength = 0;
-				matcher->cluster[clusterIndex].binType = REGEX_INVERSE_CHAR_CLASS;
-				matcher->cluster[clusterIndex].startIndex = 0;
-				clusterIndex++;
-				break;
-			case REGEX_DIGIT: 
-				matcher->cluster[clusterIndex].clusterLength = 0;
-				matcher->cluster[clusterIndex].binType = REGEX_DIGIT;
-				matcher->cluster[clusterIndex].startIndex = 0;
-				clusterIndex++;
-				break;
-			case REGEX_NOT_DIGIT: 
-				matcher->cluster[clusterIndex].clusterLength = 0;
-				matcher->cluster[clusterIndex].binType = REGEX_NOT_DIGIT;
-				matcher->cluster[clusterIndex].startIndex = 0;
-				clusterIndex++;
-				break;
-			case REGEX_WHITESPACE: 
-				matcher->cluster[clusterIndex].clusterLength = 0;
-				matcher->cluster[clusterIndex].binType = REGEX_WHITESPACE;
-				matcher->cluster[clusterIndex].startIndex = 0;
-				clusterIndex++;
-				break;
-			case REGEX_NOT_WHITESPACE: 
-				matcher->cluster[clusterIndex].clusterLength = 0;
-				matcher->cluster[clusterIndex].binType = REGEX_NOT_WHITESPACE;
-				matcher->cluster[clusterIndex].startIndex = 0;
-				clusterIndex++;
-				break;
-			default: break; // do nothing
+		if(isQuantifier(regex->compiledRegexArray[regexIndex].patternType)) {
+			matcher->cluster[clusterIndex].clusterLength = 0;
+			matcher->cluster[clusterIndex].binType = BIN_QUANTIFIABLE;
+			matcher->cluster[clusterIndex].startIndex = 0;
+			clusterIndex++;
 		}
 		regexIndex++;
 	}
-	matcher->cluster[clusterIndex].binType = REGEX_END_OF_PATTERN;
+	matcher->cluster[clusterIndex].binType = BIN_END_OF_PATTERN;
 }
 
 static void resolveClusterStartIndex(Matcher *matcher) {
 	int32_t clusterIndex = 0, startIndex = matcher->foundAtIndex;
-	while(matcher->cluster[clusterIndex].binType != REGEX_END_OF_PATTERN) {
+	while(matcher->cluster[clusterIndex].binType != BIN_END_OF_PATTERN) {
 		matcher->cluster[clusterIndex].startIndex = startIndex;
 		startIndex += matcher->cluster[clusterIndex].clusterLength;
 		clusterIndex++;
