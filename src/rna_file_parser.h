@@ -57,8 +57,10 @@ char *rnaf_get(RNA_FILE *rna_file);
  * 
  *  @param rna_file A pointer to the RNA_FILE struct representing the opened file
  *  @param offset The number of characters to read from the previous buffer
+ * 
+ *  @return Total number of elements successfully read
 */
-void rnaf_oread(RNA_FILE *rna_file, unsigned int offset);
+size_t rnaf_oread(RNA_FILE *rna_file, unsigned int offset);
 
 
 /**

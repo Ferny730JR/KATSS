@@ -93,7 +93,7 @@ rnaf_get(RNA_FILE *rna_file)
 }
 
 
-void 
+size_t 
 rnaf_oread(RNA_FILE *rna_file, unsigned int offset)
 {
 	for(unsigned int i=0; i<offset; i++) {
@@ -101,16 +101,17 @@ rnaf_oread(RNA_FILE *rna_file, unsigned int offset)
 		rna_file->buffer[i] = rna_file->buffer[indx];
 	}
 
-	unsigned int len, ret;
+	size_t len, ret;
 	len = rna_file->buffer_size - offset;
 	ret = fread(rna_file->buffer+offset, 1, len, rna_file->file);
 
 	if(len == ret) {
-		return;
+		return ret;
 	}
-	for(unsigned int i=offset+ret; i<rna_file->buffer_size; i++) {
-		rna_file->buffer[i] = '\0';
-	}
+
+	/* EOF has been reached, fill unfilled buffer with NULL */
+	memset(rna_file->buffer+offset+ret, 0, (rna_file->buffer_size-(offset+ret))*sizeof(char));
+	return ret;
 }
 
 
