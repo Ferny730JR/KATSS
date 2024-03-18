@@ -80,6 +80,11 @@ typedef enum RegexPatternType {
 	REGEX_QUANTIFIER
 } RegexPatternType;
 
+typedef enum BinPatternType {
+	BIN_END_OF_PATTERN,
+	BIN_QUANTIFIABLE
+} BinPatternType;
+
 typedef struct RegexNode {
 	RegexPatternType patternType;
 	union {
@@ -97,7 +102,7 @@ typedef struct Regex {
 } Regex;
 
 typedef struct MatcherCluster {
-	RegexPatternType binType;
+	BinPatternType binType;
 	int32_t startIndex;
 	int32_t clusterLength;
 } MatcherCluster;
