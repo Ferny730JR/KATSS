@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "rna_file_parser.h"
 #include "string_utils.h"
@@ -48,7 +49,7 @@ rnaf_open(char* filename)
 	if( (rna_file->file) == NULL ) {
 		free(rna_file->buffer);
 		free(rna_file);
-		error_message("Failed to open file '%s'",filename);
+		error_message("Failed to open file '%s': %s",filename, strerror(errno));
 		return NULL;
 	}
 
