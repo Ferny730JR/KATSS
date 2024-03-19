@@ -90,14 +90,10 @@ struct SKA_args_info
 's maximum occurreces */
   const char *fmotif_help; /**< @brief Search for a specific fixed motif, rather than all k-mers.
  help description.  */
-  char ** motif_arg;	/**< @brief Search for a specific motif, rather than all k-mers.
+  char * motif_arg;	/**< @brief Search for a specific motif, rather than all k-mers.
 .  */
-  char ** motif_orig;	/**< @brief Search for a specific motif, rather than all k-mers.
+  char * motif_orig;	/**< @brief Search for a specific motif, rather than all k-mers.
  original value given at command line.  */
-  unsigned int motif_min; /**< @brief Search for a specific motif, rather than all k-mers.
-'s minimum occurreces */
-  unsigned int motif_max; /**< @brief Search for a specific motif, rather than all k-mers.
-'s maximum occurreces */
   const char *motif_help; /**< @brief Search for a specific motif, rather than all k-mers.
  help description.  */
   

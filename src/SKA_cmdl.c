@@ -167,8 +167,6 @@ void init_args_info(struct SKA_args_info *args_info)
   args_info->fmotif_min = 0;
   args_info->fmotif_max = 0;
   args_info->motif_help = SKA_args_info_detailed_help[23] ;
-  args_info->motif_min = 0;
-  args_info->motif_max = 0;
   
 }
 
@@ -326,7 +324,8 @@ SKA_cmdline_parser_release (struct SKA_args_info *args_info)
   free_string_field (&(args_info->file_delimiter_arg));
   free_string_field (&(args_info->file_delimiter_orig));
   free_multiple_string_field (args_info->fmotif_given, &(args_info->fmotif_arg), &(args_info->fmotif_orig));
-  free_multiple_string_field (args_info->motif_given, &(args_info->motif_arg), &(args_info->motif_orig));
+  free_string_field (&(args_info->motif_arg));
+  free_string_field (&(args_info->motif_orig));
   
   
   for (i = 0; i < args_info->inputs_num; ++i)
@@ -391,7 +390,8 @@ SKA_cmdline_parser_dump(FILE *outfile, struct SKA_args_info *args_info)
   if (args_info->independent_probs_given)
     write_into_file(outfile, "independent-probs", 0, 0 );
   write_multiple_into_file(outfile, args_info->fmotif_given, "fmotif", args_info->fmotif_orig, 0);
-  write_multiple_into_file(outfile, args_info->motif_given, "motif", args_info->motif_orig, 0);
+  if (args_info->motif_given)
+    write_into_file(outfile, "motif", args_info->motif_orig, 0);
   
 
   i = EXIT_SUCCESS;
@@ -644,9 +644,6 @@ SKA_cmdline_parser_required2 (struct SKA_args_info *args_info, const char *prog_
 
   /* checks for required options */
   if (check_multiple_option_occurrences(prog_name, args_info->fmotif_given, args_info->fmotif_min, args_info->fmotif_max, "'--fmotif'"))
-     error_occurred = 1;
-  
-  if (check_multiple_option_occurrences(prog_name, args_info->motif_given, args_info->motif_min, args_info->motif_max, "'--motif'"))
      error_occurred = 1;
   
   
@@ -1503,7 +1500,6 @@ SKA_cmdline_parser_internal (
   int c;	/* Character of the parsed option.  */
 
   struct generic_list * fmotif_list = NULL;
-  struct generic_list * motif_list = NULL;
   int error_occurred = 0;
   struct SKA_args_info local_args_info;
   
@@ -1700,8 +1696,11 @@ SKA_cmdline_parser_internal (
           else if (strcmp (long_options[option_index].name, "motif") == 0)
           {
           
-            if (update_multiple_arg_temp(&motif_list, 
+          
+            if (update_arg( (void *)&(args_info->motif_arg), 
+                 &(args_info->motif_orig), &(args_info->motif_given),
                 &(local_args_info.motif_given), optarg, 0, 0, ARG_STRING,
+                check_ambiguity, override, 0, 0,
                 "motif", '-',
                 additional_error))
               goto failure;
@@ -1724,15 +1723,9 @@ SKA_cmdline_parser_internal (
     &(args_info->fmotif_orig), args_info->fmotif_given,
     local_args_info.fmotif_given, 0,
     ARG_STRING, fmotif_list);
-  update_multiple_arg((void *)&(args_info->motif_arg),
-    &(args_info->motif_orig), args_info->motif_given,
-    local_args_info.motif_given, 0,
-    ARG_STRING, motif_list);
 
   args_info->fmotif_given += local_args_info.fmotif_given;
   local_args_info.fmotif_given = 0;
-  args_info->motif_given += local_args_info.motif_given;
-  local_args_info.motif_given = 0;
   
   if (check_required)
     {
@@ -1764,7 +1757,6 @@ SKA_cmdline_parser_internal (
 
 failure:
   free_list (fmotif_list, 1 );
-  free_list (motif_list, 1 );
   
   SKA_cmdline_parser_release (&local_args_info);
   return (EXIT_FAILURE);

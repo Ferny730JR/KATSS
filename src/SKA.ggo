@@ -97,4 +97,3 @@ details="If this option is provided, then the SKA program will search for specif
 string
 typestr="pattern"
 optional
-multiple
