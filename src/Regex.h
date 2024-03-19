@@ -120,22 +120,22 @@ typedef struct Matcher {
 ╵----------------------------------*/
 
 typedef struct LenPosInfo {
-	uint32_t A;
-	uint32_t C;
-	uint32_t G;
-	uint32_t T;
+	double A;
+	double C;
+	double G;
+	double T;
 } LenPosInfo;
 
 typedef struct BinsLenInfo {
 	LenPosInfo *pos; /*< Dynamic array containing the positional information for the length */
-	uint32_t total;  /*< The total number of times this specified bin length was encountered */
+	double total;  /*< The total number of times this specified bin length was encountered */
 } BinsLenInfo;
 
 typedef struct RegexBins {
 	struct BinsLenInfo *len; /*< Dynamic array containing all possible lengths */
-	uint32_t total;  /*< The total number of times this bin was called */
-	uint32_t maxLen; /*< The maximum length the bin pattern can be*/
-	uint32_t minLen; /*< The minimum length the bin pattern can be */
+	double total;  /*< The total number of times this bin was called */
+	uint16_t maxLen; /*< The maximum length the bin pattern can be*/
+	uint16_t minLen; /*< The minimum length the bin pattern can be */
 } RegexBins;
 
 typedef struct RegexCluster {
@@ -161,5 +161,16 @@ RegexCluster *regexClusterInit(Regex *regex);
 // Add a nucleotide to a RegexCluster bin
 void
 reclustAddNT(RegexCluster *regexCluster, char nucleotide, uint8_t bin, uint32_t len, uint32_t pos);
+
 // Free the RegexCluster data structure
 void freeRegexCluster(RegexCluster *regexCluster);
+
+uint32_t 
+reclustGetNT(RegexCluster *regexCluster, char nucleotide,
+             uint8_t bin, uint32_t len, uint32_t pos);
+
+double reclustGetPosTotal(RegexCluster *regexCluster, uint8_t bin, uint32_t len, uint32_t pos);
+
+uint32_t reclustGetLenTotal(RegexCluster *regexCluster, uint8_t bin, uint32_t len);
+
+uint32_t reclustGetBinTotal(RegexCluster *regexCluster, uint8_t bin);
