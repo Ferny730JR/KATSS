@@ -231,7 +231,7 @@ static void initBin(RegexCluster *regexCluster, uint32_t bin, uint32_t min, uint
 	regexCluster->bin[bin].maxLen = max ? max : min;
 	regexCluster->bin[bin].minLen = min;
 
-	uint32_t length = max ? (max-min)+1 : min;
+	uint32_t length = max ? (max-min)+1 : 1;
 
 	initBinPos(regexCluster, length, bin);
 }
@@ -245,13 +245,13 @@ static void initBinPos(RegexCluster *regexCluster, uint32_t length, uint8_t bin)
 }
 
 static void initLenPos(RegexCluster *regexCluster, uint32_t length, uint8_t bin, uint32_t pos) {
-	regexCluster->bin[bin].len[pos].pos = s_malloc(length * sizeof(LenPosInfo));
-	for(uint32_t i = 0; i < length; i++) {
-		regexCluster->bin[bin].len[pos].pos[length].A = 0;
-		regexCluster->bin[bin].len[pos].pos[length].C = 0;
-		regexCluster->bin[bin].len[pos].pos[length].G = 0;
-		regexCluster->bin[bin].len[pos].pos[length].T = 0;
-	}
+    regexCluster->bin[bin].len[pos].pos = s_malloc(length * sizeof(LenPosInfo));
+    for(uint32_t i = 0; i < length; i++) {
+        regexCluster->bin[bin].len[pos].pos[i].A = 0;
+        regexCluster->bin[bin].len[pos].pos[i].C = 0;
+        regexCluster->bin[bin].len[pos].pos[i].G = 0;
+        regexCluster->bin[bin].len[pos].pos[i].T = 0;
+    }
 }
 
 static bool isQuantifier(RegexPatternType patternType) {
@@ -851,21 +851,24 @@ static void freeLenPos(LenPosInfo *lenPos) {
 
 static void freeBin(RegexBins *bin) {
     if (bin != NULL) {
-        for (uint32_t i = 0; i < bin->maxLen; i++) {
+		uint16_t num_lens = (bin->maxLen - bin->minLen) + 1;
+        for (uint16_t i = 0; i < num_lens; i++) {
             freeLenPos(bin->len[i].pos);
         }
-        free(bin->len);
+		free(bin->len);
     }
 }
 
 void freeRegexCluster(RegexCluster *regexCluster) {
-	if (regexCluster != NULL) {
-        if (regexCluster->bin != NULL) {
-            for (uint32_t i = 0; i < regexCluster->num_bins; i++) {
-                freeBin(&regexCluster->bin[i]);
-            }
-            free(regexCluster->bin);
-        }
-        free(regexCluster);
-    }
+	if (regexCluster == NULL) {
+		return;
+	}
+
+	if (regexCluster->bin != NULL) {
+		for (uint32_t i = 0; i < regexCluster->num_bins; i++) {
+			freeBin(&regexCluster->bin[i]);
+		}
+		free(regexCluster->bin);
+	}
+	free(regexCluster);
 }
