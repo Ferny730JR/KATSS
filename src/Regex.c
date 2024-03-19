@@ -817,6 +817,18 @@ uint32_t reclustGetNT(RegexCluster *regexCluster, char nucleotide,
 	}
 }
 
+double reclustGetPosTotal(RegexCluster *regexCluster, uint8_t bin, uint32_t len, uint32_t pos)
+{
+	double nt_total = 0;
+
+	nt_total += reclustGetNT(regexCluster, 'A', bin, len, pos);
+	nt_total += reclustGetNT(regexCluster, 'C', bin, len, pos);
+	nt_total += reclustGetNT(regexCluster, 'G', bin, len, pos);
+	nt_total += reclustGetNT(regexCluster, 'T', bin, len, pos);
+
+	return nt_total;
+}
+
 uint32_t reclustGetLenTotal(RegexCluster *regexCluster, uint8_t bin, uint32_t len) {
 	if(bin > regexCluster->num_bins) {
 		return 0;
@@ -831,18 +843,29 @@ uint32_t reclustGetBinTotal(RegexCluster *regexCluster, uint8_t bin) {
 	return regexCluster->bin[bin].total;
 }
 
+static void freeLenPos(LenPosInfo *lenPos) {
+    if (lenPos != NULL) {
+        free(lenPos);
+    }
+}
+
 static void freeBin(RegexBins *bin) {
-	int num_lens = (bin->maxLen - bin->minLen) + 1;
-	for(int len=0; len < num_lens; len++) {
-		free(bin->len[len].pos);
-	}
-	free(bin->len);
+    if (bin != NULL) {
+        for (uint32_t i = 0; i < bin->maxLen; i++) {
+            freeLenPos(bin->len[i].pos);
+        }
+        free(bin->len);
+    }
 }
 
 void freeRegexCluster(RegexCluster *regexCluster) {
-	for(int i=0; i<regexCluster->num_bins; i++) {
-		freeBin(&regexCluster->bin[i]);
-	}
-	free(regexCluster->bin);
-	free(regexCluster);
+	if (regexCluster != NULL) {
+        if (regexCluster->bin != NULL) {
+            for (uint32_t i = 0; i < regexCluster->num_bins; i++) {
+                freeBin(&regexCluster->bin[i]);
+            }
+            free(regexCluster->bin);
+        }
+        free(regexCluster);
+    }
 }
