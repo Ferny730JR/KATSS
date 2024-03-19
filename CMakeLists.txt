@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.7.1)
-project(KASS
+project(KATSS
     VERSION 1.0
     DESCRIPTION "A suite of tools for k-mer analysis of RNA sequence and structure.")
 
@@ -25,13 +25,10 @@ add_executable(SKA
     src/kmerHashTable.c
     src/string_utils.c
     src/utils.c
-    src/parallel_helpers.c
-    src/c_thread_pool/thpool.c
 	src/Regex.c
     src/SKA_cmdl.c)
 
 # Include directories for SKA
-target_include_directories(SKA PRIVATE src/c_thread_pool)
 target_include_directories(SKA PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
 # Include directories for BPP
@@ -45,15 +42,15 @@ target_include_directories(bppPipeline PRIVATE ${VIENNARNA_INCLUDE_DIRS})
 # Specify compiler options based on OS
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # SKA compiler options
-    target_compile_options(SKA  PRIVATE -Wall -O3 -lm)
-    target_link_options(SKA  PRIVATE -Wall -O3 -flto -fopenmp -lm)
+    target_compile_options(SKA PRIVATE -g -Wall -O3 -lm)
+    target_link_options(SKA PRIVATE -g -Wall -O3 -flto -fopenmp -lm)
 
     # bppPipeline compiler options
-    target_compile_options(bppPipeline PRIVATE -Wall -O3 -lm)
-    target_link_options(bppPipeline PRIVATE -Wall -flto -fopenmp -O3 -lm -lstdc++)
+    target_compile_options(bppPipeline PRIVATE -g -Wall -O3 -lm)
+    target_link_options(bppPipeline PRIVATE -g -Wall -flto -fopenmp -O3 -lm -lstdc++)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin") # Apple
-    target_compile_options(SKA PRIVATE -Wall -Wextra -Wpedantic -flto -O3)
-    target_compile_options(bppPipeline PRIVATE -Wall -flto -O3)
+    target_compile_options(SKA PRIVATE -g -Wall -Wextra -Wpedantic -flto -O3)
+    target_compile_options(bppPipeline PRIVATE -g -Wall -flto -O3)
 else()
     message( SEND_ERROR "System ${CMAKE_SYSTEM_NAME} currently not supported.")
 endif()
