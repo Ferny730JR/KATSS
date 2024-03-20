@@ -59,7 +59,10 @@ kmerHashTable *
 predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer);
 
 void
-count_fmotifs(char *filename, options *opt);
+process_fmotifs(options *opt);
+
+uint64_t
+count_fmotifs(char *filename, char *fmotif);
 
 void
 process_motifs(options *opt);
@@ -263,7 +266,7 @@ main(int argc, char **argv)
 	##########################################################*/
 
 	if(opt.fmotif) {
-		printf("In fmotif!\n");
+		process_fmotifs(&opt);
 	} else if (opt.motif) {
 		process_motifs(&opt);
 	} else {
@@ -444,29 +447,50 @@ predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer)
 
 
 void
-count_fmotifs(char *filename, options *opt)
+process_fmotifs(options *opt)
 {
+	RNA_FILE *input_file = rnaf_open(opt->input_file);
+	RNA_FILE *bound_file = rnaf_open(opt->bound_file);
+
+	uint64_t input_numlines = rnaf_numlines(input_file);
+	uint64_t bound_numlines = rnaf_numlines(input_file);
+
+	uint64_t input_total = rnaf_numchars(input_file);
+	uint64_t bound_total = rnaf_numchars(bound_file);
+
+	rnaf_close(input_file);
+	rnaf_close(bound_file);
+
+	for(int i = 0; i < opt->num_motifs; i++) {
+		uint64_t input_counts = count_fmotifs(opt->input_file, opt->fmotif[i]);
+		input_total -= (input_numlines * strlen(opt->fmotif[i]));
+		double input_frq = (double)input_counts / input_total;
+
+		uint64_t bound_counts = count_fmotifs(opt->bound_file, opt->fmotif[i]);
+		bound_total -= (bound_numlines * strlen(opt->fmotif[i]));
+		double bound_frq = (double)bound_counts / bound_total;
+
+		fprintf(opt->out_file, "%s,%f", opt->fmotif[i], log2(bound_frq/input_frq));
+	}
+}
+
+
+uint64_t
+count_fmotifs(char *filename, char *fmotif)
+{	/* Open file to read */
 	RNA_FILE *read_file = rnaf_open(filename);
 	rnaf_rebuff(read_file, 65536);
 
-	for(int i=0; i<opt->num_motifs; i++) {
-		rnaf_oread(read_file, strlen(opt->fmotif[i]));
-		unsigned int matches = rnaf_search(read_file, opt->fmotif[i]);
-		printf("Matches: %d",matches);
+	uint64_t total_matches = 0;
+	size_t fmotif_len = strlen(fmotif) - 1;
+
+	/* Loop through entire file and search for fmotif */
+	while(rnaf_oread(read_file, fmotif_len)) {
+		total_matches += rnaf_search(read_file, fmotif);
 	}
-	/*
-		Idea:
-		**motifs is an array of char arrays, as such to access the strings you need
-		to index 'motifs'. The kcounter structure will use these indeces as the mapping
-		to the counter, which will allow for fast lookup in the addition for multiple patterns.
+	rnaf_close(read_file);
 
-		Alongside this, we can use the boyer-moore algorithm to find the number of matches. We can
-		also build a regexp interpreter to handle regular expressions.
-
-		To exploit the boyer-moore, we need to modify RNA_FILE struct to include a large buffer
-		that we can search through. We can do this by having an rnaf_open function that takes
-		a buffer size parameter.
-	*/
+	return total_matches;
 }
 
 
