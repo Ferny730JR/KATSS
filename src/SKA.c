@@ -4,6 +4,7 @@
 #include <math.h>
 #include <unistd.h>
 #include <float.h>
+#include <errno.h>
 
 #include "rna_file_parser.h"
 #include "kmer_counter.h"
@@ -66,6 +67,9 @@ count_fmotifs(char *filename, char *fmotif);
 
 void
 process_motifs(options *opt);
+
+void
+process_motif(char *motif, options *opt);
 
 RegexCluster *
 count_motifs(char *filename, char *pattern);
@@ -497,8 +501,35 @@ count_fmotifs(char *filename, char *fmotif)
 void
 process_motifs(options *opt)
 {
+	if(access(opt->motif, F_OK|R_OK) != 0) {
+		/* Argument passed is the motif pattern */
+		process_motif(opt->motif, opt);
+		return;
+	}
+
+	/* Argument passed is a file */
+	FILE *fp = fopen(opt->motif, "r");
+	if(fp == NULL) {
+		error_message("Unable to open file '%s' for reading: %s",opt->motif, strerror(errno));
+		return;
+	}
+
+	char buf[1024];
+	while(fgets(buf, 1024, fp)) {
+		remove_escapes(buf);
+		
+		fprintf(opt->out_file, "%s\n",buf);
+		process_motif(buf, opt);
+		fprintf(opt->out_file, "-\n");
+	}
+}
+
+
+void
+process_motif(char *motif, options *opt)
+{
 	/* Get the counts and frequencies of the motif matches in the input file */
-	RegexCluster *input = count_motifs(opt->input_file, opt->motif);
+	RegexCluster *input = count_motifs(opt->input_file, motif);
 	if(input) {
 		get_cluster_frequencies(input);
 	} else {
@@ -506,7 +537,7 @@ process_motifs(options *opt)
 	}
 
 	/* Get the counts and frequencies of the motif matches in the bound file */
-	RegexCluster *bound = count_motifs(opt->bound_file, opt->motif);
+	RegexCluster *bound = count_motifs(opt->bound_file, motif);
 	if(bound) {
 		get_cluster_frequencies(bound);
 	} else {
@@ -514,7 +545,7 @@ process_motifs(options *opt)
 		return; // failed to open file, so break
 	}
 
-	RegexCluster *enrichments = get_cluster_enrichment(input, bound, opt->motif);
+	RegexCluster *enrichments = get_cluster_enrichment(input, bound, motif);
 	
 	cluster_to_file(opt->out_file, enrichments, opt->file_delimiter);
 	
@@ -539,7 +570,7 @@ count_motifs(char *filename, char *pattern)
 	Regex regex;
 	regexCompile(&regex, pattern);
 	if(!regex.isPatternValid) {
-		error_message("%s",regex.errorMessage);
+		error_message("Could not compile '%s': %s", pattern, regex.errorMessage);
 		rnaf_close(read_file);
 		return NULL;
 	}
