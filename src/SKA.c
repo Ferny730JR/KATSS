@@ -88,6 +88,16 @@ get_pos_frequencies(BinsLenInfo *len, uint16_t num_pos);
 double
 get_pos_total(LenPosInfo pos);
 
+RegexCluster *
+get_cluster_enrichment(RegexCluster *input_cluster, RegexCluster *bound_cluster, char *pattern);
+
+void
+get_bin_enrichment(RegexBins *enr_bin, RegexBins in_bin, RegexBins bo_bin);
+
+void
+get_pos_enrichments(BinsLenInfo *enr_len, BinsLenInfo in_len, 
+                    BinsLenInfo bo_len, uint16_t num_pos);
+
 Entry *
 kmer_max_entry(kmerHashTable *hash_table);
 
@@ -96,6 +106,13 @@ delimiter_to_char(char *user_delimiter);
 
 void
 entry_to_file(FILE *file, Entry *entry, char delimiter);
+
+void
+cluster_to_file(FILE *file, RegexCluster *cluster, char delimiter);
+
+void
+clusterlen_to_file(BinsLenInfo len, uint8_t bin, uint16_t lenlen, uint16_t 
+                   maxlen, FILE *file, char delimiter);
 
 void
 free_options(options *opt);
@@ -473,8 +490,13 @@ process_motifs(options *opt)
 		return; // failed to open file, so break
 	}
 
+	RegexCluster *enrichments = get_cluster_enrichment(input, bound, opt->motif);
+	
+	cluster_to_file(opt->out_file, enrichments, opt->file_delimiter);
+	
 	freeRegexCluster(input);
 	freeRegexCluster(bound);
+	freeRegexCluster(enrichments);
 }
 
 
@@ -663,6 +685,48 @@ get_pos_total(LenPosInfo pos)
 	return pos.A + pos.C + pos.G + pos.T;
 }
 
+
+RegexCluster *
+get_cluster_enrichment(RegexCluster *input_cluster, RegexCluster *bound_cluster, char *pattern)
+{
+	Regex regex;
+	regexCompile(&regex, pattern);
+	RegexCluster *enrichment_cluster = regexClusterInit(&regex);
+
+	for(uint8_t cur_bin = 0; cur_bin < enrichment_cluster->num_bins; cur_bin++) {
+		get_bin_enrichment(&enrichment_cluster->bin[cur_bin],
+		                   input_cluster->bin[cur_bin],
+						   bound_cluster->bin[cur_bin]);
+	}
+
+	return enrichment_cluster;
+}
+
+
+void
+get_bin_enrichment(RegexBins *enr_bin, RegexBins in_bin, RegexBins bo_bin)
+{
+	uint32_t num_lens = (enr_bin->maxLen - enr_bin->minLen) + 1;
+	for(uint32_t cur_len = 0; cur_len < num_lens; cur_len++) {
+		enr_bin->len[cur_len].total = bo_bin.len[cur_len].total / in_bin.len[cur_len].total;
+
+		uint16_t lenlen = enr_bin->minLen + cur_len;
+		get_pos_enrichments(&enr_bin->len[cur_len], in_bin.len[cur_len], 
+		                     bo_bin.len[cur_len], lenlen);
+	}
+}
+
+
+void
+get_pos_enrichments(BinsLenInfo *enr_len, BinsLenInfo in_len, BinsLenInfo bo_len, uint16_t num_pos)
+{
+	for(uint16_t cur_pos = 0; cur_pos < num_pos; cur_pos++) {
+		enr_len->pos[cur_pos].A = bo_len.pos[cur_pos].A / in_len.pos[cur_pos].A;
+		enr_len->pos[cur_pos].C = bo_len.pos[cur_pos].C / in_len.pos[cur_pos].C;
+		enr_len->pos[cur_pos].G = bo_len.pos[cur_pos].G / in_len.pos[cur_pos].G;
+		enr_len->pos[cur_pos].T = bo_len.pos[cur_pos].T / in_len.pos[cur_pos].T;
+	}
+}
 /*##########################################################
 #  Helper Functions                                        #
 ##########################################################*/
@@ -726,6 +790,58 @@ void
 entry_to_file(FILE *file, Entry *entry, char delimiter)
 {
     fprintf(file, "%s%c%f\n", entry->key, delimiter, entry->values[0]);
+}
+
+
+void
+cluster_to_file(FILE *file, RegexCluster *cluster, char delimiter)
+{
+	/* Get the max len */
+	uint16_t cur, max_len = 0;
+	for(uint8_t cur_bin = 0; cur_bin < cluster->num_bins; cur_bin++)
+	{
+		cur = (cluster->bin[cur_bin].maxLen - cluster->bin[cur_bin].minLen) + 1;
+		if(cur>max_len) {
+			max_len = cur;
+		}
+	}
+
+	/* Print the header of CSV file */
+	fprintf(file, "bin%clength%clength_pref",delimiter,delimiter);
+	for(uint16_t i = 0; i < max_len; i++) {
+		fprintf(file, "%cNT%d_pref", delimiter, i+1);
+	}
+	fprintf(file, "\n");
+
+	/* Output cluster to file */
+	for(uint8_t cur_bin = 0; cur_bin < cluster->num_bins; cur_bin++) {
+		uint16_t num_lens = (cluster->bin[cur_bin].maxLen - cluster->bin[cur_bin].minLen) + 1;
+		for(uint16_t cur_len = 0; cur_len < num_lens; cur_len++) {
+			uint16_t lenlen = cur_len + cluster->bin[cur_bin].minLen;
+			clusterlen_to_file(cluster->bin[cur_bin].len[cur_len], cur_bin, lenlen, max_len, file, delimiter);
+		}
+	}
+
+}
+
+
+void
+clusterlen_to_file(BinsLenInfo len, uint8_t bin, uint16_t lenlen, uint16_t 
+                   maxlen, FILE *file, char delimiter)
+{
+	fprintf(file, "%d,%d,%f",bin+1,lenlen,len.total);
+	for(uint16_t cur = 0; cur < maxlen; cur++) {
+		if(cur < lenlen) {
+			fprintf(file, "%c\"A:%f", delimiter, len.pos[cur].A);
+			fprintf(file, "%cC:%f", delimiter, len.pos[cur].C);
+			fprintf(file, "%cG:%f", delimiter, len.pos[cur].G);
+			fprintf(file, "%cT:%f\"", delimiter, len.pos[cur].T);
+		} else {
+			fprintf(file, "%c-", delimiter);
+		}
+	}
+	fprintf(file, "\n");
+
 }
 
 
