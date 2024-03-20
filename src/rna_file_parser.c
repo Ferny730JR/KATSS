@@ -41,8 +41,11 @@ rnaf_open(char* filename)
 {
 	RNA_FILE *rna_file = s_malloc(sizeof *rna_file);
 	rna_file->file = fopen(filename, "r");
+	rna_file->filename = filename;
 	rna_file->buffer = s_malloc(MAX_SEQ_LENGTH * sizeof(char));
 	rna_file->buffer_size = MAX_SEQ_LENGTH;
+	rna_file->num_chars = 0;
+	rna_file->num_lines = 0;
 	memset(rna_file->buffer, 0, MAX_SEQ_LENGTH * sizeof(char)); // init buffer to '\0'
 
 	/* Check if we can open file for reading */
@@ -158,7 +161,6 @@ rnaf_search(RNA_FILE *rna_file, const char *sequence)
 		}
 
 		if (j < 0) {
-			// printf("pattern occurs at shift = %d\n", s);
 			counts++;
 			s += (s + m < n) ? m - badchar[(uint8_t)rna_file->buffer[s + m]] : 1;
 		}
@@ -169,6 +171,81 @@ rnaf_search(RNA_FILE *rna_file, const char *sequence)
 	}
 
 	return counts;
+}
+
+
+unsigned long
+rnaf_numchars(RNA_FILE *rna_file)
+{	/* If numchars has already been calculated, return */
+	if(rna_file->num_chars) {
+		return rna_file->num_chars;
+	}
+
+	/* Open a new FILE pointer to not mess up RNA_FILE's pointer */
+	FILE *fp = fopen(rna_file->filename, "r");
+	if(fp == NULL) {
+		error_message("rnaf Failed get numchars: %s", strerror(errno));
+		return 0;
+	}
+
+	/* Count the number of characters read in file */
+	char buf[65536];
+	unsigned long total_chars = 0;
+	while(1) {
+		size_t res = fread(buf, 1, 65536, fp);
+		if(ferror(fp)) {
+			error_message("Failed to read file: %s", strerror(errno));
+			return 0;
+		}
+
+		total_chars += res;
+
+		if(feof(fp)) {
+			break;
+		}
+	}
+
+	/* Update num_chars and return */
+	rna_file->num_chars = total_chars;
+	return total_chars;
+}
+
+
+unsigned long
+rnaf_numlines(RNA_FILE *rna_file)
+{
+	if(rna_file->num_lines) {
+		return rna_file->num_lines;
+	}
+
+	FILE *fp = fopen(rna_file->filename, "r");
+	if(fp == NULL) {
+		error_message("rnaf Failed get numchars: %s", strerror(errno));
+		return 0;
+	}
+
+	char buf[65536];
+	unsigned long counter = 0;
+	while(1) {
+		size_t res = fread(buf, 1, 65536, fp);
+		if(ferror(fp)) {
+			error_message("Failed to read file: %s", strerror(errno));
+			return 0;
+		}
+
+		for(size_t i = 0; i < res; i++) {
+			if(buf[i] == '\n') {
+				counter++;
+			}
+		}
+
+		if(feof(fp)) {
+			break;
+		}
+	}
+
+	rna_file->num_lines = counter;
+	return counter;
 }
 
 
