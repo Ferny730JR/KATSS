@@ -11,8 +11,11 @@
  */
 typedef struct RNA_FILE {
     FILE *file;                     /** File pointer for the RNA file. */
+	char *filename;                 /** String storing the name of the opened file. */
     char *buffer;                   /** Character buffer to store sequence data. */
-	unsigned int buffer_size;       /** Int to store the size of the buffer */
+	unsigned int buffer_size;       /** Int to store the size of the buffer.  */
+	unsigned long num_chars;        /** Number to store the total number of chars in file. */
+	unsigned long num_lines;        /** Number to store the total number of lines in file. */
     char filetype;                  /** Character to store which file type was passed. */
 } RNA_FILE;
 
@@ -75,7 +78,7 @@ void rnaf_close(RNA_FILE *rna_file);
 
 
 /**
- *  @brief Change the size of the buffer
+ *  @brief Change the size of the buffer.
  * 
  *  This function reallocates the amount of memory the buffer uses.
  * 
@@ -87,9 +90,39 @@ rnaf_rebuff(RNA_FILE *rna_file, unsigned int size);
 
 
 /**
- *  @brief Search for sequence in RNA_FILE
+ *  @brief Search for sequence in RNA_FILE.
+ * 
+ *  @param rna_file A pointer to the RNA_FILE struct representing the opened file
+ *  @param sequence The sequence to search for in RNA_FILE
+ * 
+ *  @return The total number of times sequence was found in rna_file
 */
 unsigned int
 rnaf_search(RNA_FILE *rna_file, const char *sequence);
+
+
+/** 
+ *  @brief Count the number of characters in RNA_FILE.
+ * 
+ *  @param rna_file A pointer to the RNA_FILE struct representing the opened file
+ * 
+ *  @return The total number of characters in rna_file
+ *  
+*/
+unsigned long
+rnaf_numchars(RNA_FILE *rna_file);
+
+
+/** 
+ *  @brief Count the number of lines in RNA_FILE.
+ *
+ *  This function counts the total number of newline characters present in RNA_FILE.
+ * 
+ *  @param rna_file A pointer to the RNA_FILE struct representing the opened file.
+ * 
+ *  @return The number of lines in RNA_FILE
+*/
+unsigned long
+rnaf_numlines(RNA_FILE *rna_file);
 
 #endif // FILE_PARSER
