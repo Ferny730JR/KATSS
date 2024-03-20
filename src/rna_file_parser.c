@@ -258,9 +258,13 @@ parse_fasta(RNA_FILE *rna_file, char **ret_seq)
 {   /* Init seq, will be realloc'd based on input stream */
 	char    *seq = NULL;
 
-	while (fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file)) { 
+	while (fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file)) { 
 		if (rna_file->buffer[0] == '>') {
-			break;      /* New sequence, so break */
+			/* If buffer wasn't large enough to store header, keep reading */
+			while(is_full(rna_file->buffer, rna_file->buffer_size)) {
+				fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file);
+			}
+			break;  /* New sequence, so break */
 		}
 
 		/* Append sequence found in buffer into seq variable */
@@ -278,12 +282,16 @@ parse_fastq(RNA_FILE *rna_file, char **ret_seq)
 	char            *seq = NULL; /* Init seq, will be realloc'd based on input stream */
 	unsigned int    reading_seq = 1;
 
-	while(fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file)) {
-		if(rna_file->buffer[0] == '@' ) {
+	while(fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file)) {
+		if(rna_file->buffer[0] == '@') {
+			/* If buffer wasn't large enough to store header, keep reading */
+			while(is_full(rna_file->buffer, rna_file->buffer_size)) {
+				fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file);
+			}
 			break;  /* New sequence, so break */
 		}
 
-		if ( rna_file->buffer[0] == '+' ) {
+		if(rna_file->buffer[0] == '+') {
 			reading_seq = 0;
 			continue;   /* Reading from metadata, so skip iteration */
 		}
@@ -366,7 +374,7 @@ is_nucleotide(char character)
 }
 
 
-int 
+static int 
 is_full(char *buffer, int buffer_size) 
 {
 	int ret=0;
@@ -380,7 +388,7 @@ is_full(char *buffer, int buffer_size)
 
 
 // The preprocessing function for Boyer Moore's bad character heuristic
-void 
+static void 
 badCharHeuristic(const char* str, int size, int badchar[NO_OF_CHARS])
 {
 	int i;
