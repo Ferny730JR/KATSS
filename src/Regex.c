@@ -179,6 +179,7 @@ Matcher regexMatch(Regex *regex, const char *text) {
 RegexCluster *regexClusterInit(Regex *regex) {
 	RegexCluster *regexCluster = s_malloc(sizeof *regexCluster);
 	regexCluster->num_bins = 0;
+	regexCluster->total = 0;
 
 	RegexNode *re_node = regex->compiledRegexArray;
 
