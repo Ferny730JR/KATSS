@@ -141,6 +141,7 @@ typedef struct RegexBins {
 typedef struct RegexCluster {
 	struct RegexBins *bin;
 	uint8_t num_bins;
+	double total;
 } RegexCluster;
 
 /*----------------------------------╷
