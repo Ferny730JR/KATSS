@@ -68,7 +68,7 @@ count_fmotifs(char *filename, char *fmotif);
 void
 process_motifs(options *opt);
 
-void
+RegexCluster *
 process_motif(char *motif, options *opt);
 
 RegexCluster *
@@ -501,9 +501,17 @@ count_fmotifs(char *filename, char *fmotif)
 void
 process_motifs(options *opt)
 {
-	if(access(opt->motif, F_OK|R_OK) != 0) {
-		/* Argument passed is the motif pattern */
-		process_motif(opt->motif, opt);
+	RegexCluster *enrichment;
+
+	/* Check if motif is a file */
+	if(access(opt->motif, F_OK) != 0) {
+		enrichment = process_motif(opt->motif, opt);
+		if(enrichment == NULL) {
+			return;
+		}
+
+		fprintf(opt->out_file, "%s%c%f\n", opt->motif, opt->file_delimiter, enrichment->total);
+		cluster_to_file(opt->out_file, enrichment, opt->file_delimiter);
 		return;
 	}
 
@@ -517,15 +525,22 @@ process_motifs(options *opt)
 	char buf[1024];
 	while(fgets(buf, 1024, fp)) {
 		remove_escapes(buf);
-		
-		fprintf(opt->out_file, "%s\n",buf);
-		process_motif(buf, opt);
-		fprintf(opt->out_file, "-\n");
+
+		/* Calculate the cluster enrichments of the motif */
+		RegexCluster *enrichment = process_motif(buf, opt);
+		if(enrichment == NULL) {
+			return;
+		}
+
+		/* Output the cluster enrichments to file */
+		fprintf(opt->out_file, "%s%c%f\n", buf, opt->file_delimiter, enrichment->total);
+		cluster_to_file(opt->out_file, enrichment, opt->file_delimiter);
+		fprintf(opt->out_file, "\n");
 	}
 }
 
 
-void
+RegexCluster *
 process_motif(char *motif, options *opt)
 {
 	/* Get the counts and frequencies of the motif matches in the input file */
@@ -533,7 +548,7 @@ process_motif(char *motif, options *opt)
 	if(input) {
 		get_cluster_frequencies(input);
 	} else {
-		return; // failed to open file, so break
+		return NULL; // failed to open file, so break
 	}
 
 	/* Get the counts and frequencies of the motif matches in the bound file */
@@ -542,16 +557,15 @@ process_motif(char *motif, options *opt)
 		get_cluster_frequencies(bound);
 	} else {
 		freeRegexCluster(input);
-		return; // failed to open file, so break
+		return NULL; // failed to open file, so break
 	}
 
 	RegexCluster *enrichments = get_cluster_enrichment(input, bound, motif);
 	
-	cluster_to_file(opt->out_file, enrichments, opt->file_delimiter);
-	
 	freeRegexCluster(input);
 	freeRegexCluster(bound);
-	freeRegexCluster(enrichments);
+	
+	return enrichments;
 }
 
 
@@ -601,6 +615,8 @@ count_motifs(char *filename, char *pattern)
 void
 process_motif_match(RegexCluster *cluster, Matcher matcher, char *search)
 {
+	cluster->total++;
+
 	uint8_t clusterIndex = 0;
 	while(matcher.cluster[clusterIndex].binType != BIN_END_OF_PATTERN) {
 		int32_t binClusterLength = matcher.cluster[clusterIndex].clusterLength;
@@ -743,11 +759,15 @@ get_pos_total(LenPosInfo pos)
 
 RegexCluster *
 get_cluster_enrichment(RegexCluster *input_cluster, RegexCluster *bound_cluster, char *pattern)
-{
+{	/* Create the enrichment cluster */
 	Regex regex;
 	regexCompile(&regex, pattern);
 	RegexCluster *enrichment_cluster = regexClusterInit(&regex);
 
+	/* Get overall enrichment */
+	enrichment_cluster->total = bound_cluster->total / input_cluster->total;
+
+	/* Get the enrichments for the bins */
 	for(uint8_t cur_bin = 0; cur_bin < enrichment_cluster->num_bins; cur_bin++) {
 		get_bin_enrichment(&enrichment_cluster->bin[cur_bin],
 		                   input_cluster->bin[cur_bin],
@@ -862,7 +882,7 @@ cluster_to_file(FILE *file, RegexCluster *cluster, char delimiter)
 	}
 
 	/* Print the header of CSV file */
-	fprintf(file, "bin%clength%clength_pref",delimiter,delimiter);
+	fprintf(file, "bin%clength%clength_pref", delimiter, delimiter);
 	for(uint16_t i = 0; i < max_len; i++) {
 		fprintf(file, "%cNT%d_pref", delimiter, i+1);
 	}
