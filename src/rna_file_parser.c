@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 
@@ -22,10 +23,10 @@ parse_reads(RNA_FILE *rna_file, char **ret_seq);
 static char
 determine_filetype(char peek);
 
-static int
+static bool
 is_nucleotide(char character);
 
-static int
+static bool
 is_full(char *buffer, int buffer_size);
 
 static void
@@ -162,11 +163,11 @@ rnaf_search(RNA_FILE *rna_file, const char *sequence)
 
 		if (j < 0) {
 			counts++;
-			s += (s + m < n) ? m - badchar[(uint8_t)rna_file->buffer[s + m]] : 1;
+			s += (s + m < n) ? m - badchar[(unsigned int)rna_file->buffer[s + m]] : 1;
 		}
 
 		else {
-			s += MAX2(1, j - badchar[(uint8_t)rna_file->buffer[s + j]]);
+			s += MAX2(1, j - badchar[(unsigned int)rna_file->buffer[s + j]]);
 		}
 	}
 
@@ -351,39 +352,29 @@ determine_filetype(char peek)
 }
 
 
-static int
-is_nucleotide(char character) 
+static bool
+is_nucleotide(char character)
 {
-	int ret;
-
 	switch(character) {
-		case 'A':   ret = 1;    break;
-		case 'a':   ret = 1;    break;
-		case 'C':   ret = 1;    break;
-		case 'c':   ret = 1;    break;
-		case 'G':   ret = 1;    break;
-		case 'g':   ret = 1;    break;
-		case 'T':   ret = 1;    break;
-		case 't':   ret = 1;    break;
-		case 'U':   ret = 1;    break;
-		case 'u':   ret = 1;    break;
-		default:    ret = 0;    break;
+		case 'A':   return true;
+		case 'a':   return true;
+		case 'C':   return true;
+		case 'c':   return true;
+		case 'G':   return true;
+		case 'g':   return true;
+		case 'T':   return true;
+		case 't':   return true;
+		case 'U':   return true;
+		case 'u':   return true;
+		default:    return false;
 	}
-
-	return ret;
 }
 
 
-static int 
-is_full(char *buffer, int buffer_size) 
+static bool
+is_full(char *buffer, int buffer_size)
 {
-	int ret=0;
-
-	if( buffer[buffer_size-1] == '\0' && is_nucleotide(buffer[buffer_size-2]) ) { // full
-		ret=1;
-	}
-
-	return ret;
+	return buffer[buffer_size-1] == '\0' && is_nucleotide(buffer[buffer_size-2]);
 }
 
 
