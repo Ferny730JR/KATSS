@@ -12,6 +12,7 @@ init_kcounter(unsigned int k_mer)
 	kctr->k_mer = k_mer;
 	kctr->capacity = 1 << (2 * k_mer);   // 4^k_mer
 	kctr->entries = s_calloc(kctr->capacity, sizeof(unsigned int));
+	kctr->total_count = 0;
 
 	return kctr;
 }
@@ -31,11 +32,12 @@ kctr_hash(const char *key, int start, int length)
 	unsigned int hash_value = 0;
 	for(int i=start; i<start+length; i++) {
 		switch(key[i]) {
-			case 'X': return -1;
 			case 'A': hash_value = hash_value * 4;     break;
 			case 'C': hash_value = hash_value * 4 + 1; break;
 			case 'G': hash_value = hash_value * 4 + 2; break;
-			default : hash_value = hash_value * 4 + 3; break;
+			case 'T': hash_value = hash_value * 4 + 3; break;
+			case 'U': hash_value = hash_value * 4 + 3; break;
+			default : return -1;
 		}
 	}
 
