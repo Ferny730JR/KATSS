@@ -8,7 +8,7 @@ KATSS is a collection of C programs designed for the analysis of RNA sequences, 
 
 The tools allow you to:
 * Calculate the motif of RNA-binding proteins
-* Determine the alternative motifs
+* Determine the secondary motifs
 * Find the nucleotide and length preference of varying motifs
 * Search for specific sequences
 * Predict the binding preference of a protein
@@ -44,7 +44,7 @@ One issue you might encounter with the previous installation is that it requires
 ```bash
 cmake -DCMAKE_INSTALL_PREFIX=/your/preferred/path .
 make
-sudo make install
+make install
 ```
 
 Ensure that the specified path is included in your system's `PATH` environment variable to execute the binaries conveniently from any location.
