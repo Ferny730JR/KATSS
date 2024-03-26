@@ -1,4 +1,4 @@
-package "Streaming K-mer Analysis"
+package "SKA - Streaming K-mer Analysis"
 
 purpose "RNA motif discovery tool"
 

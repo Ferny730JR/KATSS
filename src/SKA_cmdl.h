@@ -21,12 +21,12 @@ extern "C" {
 
 #ifndef SKA_CMDLINE_PARSER_PACKAGE
 /** @brief the program name (used for printing errors) */
-#define SKA_CMDLINE_PARSER_PACKAGE "Streaming K-mer Analysis"
+#define SKA_CMDLINE_PARSER_PACKAGE "SKA - Streaming K-mer Analysis"
 #endif
 
 #ifndef SKA_CMDLINE_PARSER_PACKAGE_NAME
 /** @brief the complete program name (used for help and version) */
-#define SKA_CMDLINE_PARSER_PACKAGE_NAME "Streaming K-mer Analysis"
+#define SKA_CMDLINE_PARSER_PACKAGE_NAME "SKA - Streaming K-mer Analysis"
 #endif
 
 #ifndef SKA_CMDLINE_PARSER_VERSION
