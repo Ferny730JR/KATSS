@@ -43,6 +43,16 @@ void kctr_increment(KmerCounter *kcounter, char *sequence);
 
 
 /**
+ * @brief Return the total number of counts in kcounter.
+ * 
+ * This functions gets the cumulative sum of the counts for each k-mer.
+ * 
+ * @param kcounter Pointer to the KmerCounter structure.
+ * 
+ * @return The total count
+*/
+unsigned long kctr_total(KmerCounter *kcounter);
+/**
  * @brief Increments the count for a specific substring in a given sequence.
  *
  * Increments the count of the k-mer formed by the substring starting at 'start' with the specified length.
