@@ -21,12 +21,12 @@ extern "C" {
 
 #ifndef BPPPIPELINE_CMDLINE_PARSER_PACKAGE
 /** @brief the program name (used for printing errors) */
-#define BPPPIPELINE_CMDLINE_PARSER_PACKAGE "Base-Pair Probability Pipeline"
+#define BPPPIPELINE_CMDLINE_PARSER_PACKAGE "bppPipeline - Base-Pair Probability Pipeline"
 #endif
 
 #ifndef BPPPIPELINE_CMDLINE_PARSER_PACKAGE_NAME
 /** @brief the complete program name (used for help and version) */
-#define BPPPIPELINE_CMDLINE_PARSER_PACKAGE_NAME "Base-Pair Probability Pipeline"
+#define BPPPIPELINE_CMDLINE_PARSER_PACKAGE_NAME "bppPipeline - Base-Pair Probability Pipeline"
 #endif
 
 #ifndef BPPPIPELINE_CMDLINE_PARSER_VERSION

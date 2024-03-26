@@ -1,4 +1,4 @@
-package "Base-Pair Probability Pipeline"
+package "bppPipeline - Base-Pair Probability Pipeline"
 
 purpose "A method for finding the average base-pair probability of all kmers in a protein"
 
