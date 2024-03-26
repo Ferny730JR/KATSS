@@ -33,6 +33,9 @@ typedef struct options {
 
 	char    **top_kmer;
 	int     cur_iter;
+
+	unsigned long input_total;
+	unsigned long bound_total;
 } options;
 
 
@@ -149,6 +152,9 @@ init_default_options(options *opt)
 
 	opt->top_kmer       = NULL;
 	opt->cur_iter       = 0;
+
+	opt->input_total    = 0;
+	opt->bound_total    = 0;
 }
 
 
@@ -308,10 +314,14 @@ process_iteration(options *opt)
 		free_kmer_table(kmer_data.dimer_frq);
 	} else {
 		KmerCounter *input_counts = count_kmers(opt->input_file, opt);
+		opt->input_total = opt->input_total ? opt->input_total : kctr_total(input_counts);
+		input_counts->total_count = opt->input_total;
 		input_table = get_frequencies(input_counts);
 		free_kcounter(input_counts);
 
 		KmerCounter *bound_counts = count_kmers(opt->bound_file, opt);
+		opt->bound_total = opt->bound_total ? opt->bound_total : kctr_total(bound_counts);
+		bound_counts->total_count = opt->bound_total;
 		bound_table = get_frequencies(bound_counts);
 		free_kcounter(bound_counts);
 	}
