@@ -177,6 +177,14 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
+		
+	if(!args_info.input_given && !args_info.bound_given) {
+		printf("Usage: SKA [OPTIONS] [<input.fa>] [<bound.fa>]\n");
+		printf("Try 'SKA --help' for more information.\n");
+		SKA_cmdline_parser_free(&args_info);
+		exit(EXIT_FAILURE);
+	}
+
 	if(args_info.input_given) {
 		opt.input_file = strdup(args_info.input_arg);
 		if(access(opt.input_file, F_OK|R_OK) != 0) {
@@ -195,6 +203,11 @@ main(int argc, char **argv)
 			free_options(&opt);
 			exit(EXIT_FAILURE);
 		}
+	} else {
+		error_message("You need to provide a 'bound' file");
+		SKA_cmdline_parser_free(&args_info);
+		free_options(&opt);
+		exit(EXIT_FAILURE);
 	}
 
 	if(args_info.output_given) {
@@ -266,6 +279,13 @@ main(int argc, char **argv)
 	opt.top_kmer = s_malloc(opt.iterations * sizeof(char *));
 	for(int i=0; i<opt.iterations; i++) {
 		opt.top_kmer[i] = NULL;
+	}
+
+	if(!opt.independent_probs && !opt.input_file) {
+		error_message("You need to provide an 'input' file");
+		SKA_cmdline_parser_free(&args_info);
+		free_options(&opt);
+		exit(EXIT_FAILURE);
 	}
 
 	SKA_cmdline_parser_free(&args_info);
@@ -943,7 +963,9 @@ free_options(options *opt)
         free(opt->out_filename);
     }
     for(int i=0; i<opt->iterations; i++) {
-        free(opt->top_kmer[i]);
+		if(opt->top_kmer) {
+        	free(opt->top_kmer[i]);
+		}
     }
 	if(opt->motif) {
 		free(opt->motif);
@@ -954,8 +976,12 @@ free_options(options *opt)
 		}
 		free(opt->fmotif);
 	}
-    free(opt->top_kmer);
-    fclose(opt->out_file);
+	if(opt->top_kmer) {
+    	free(opt->top_kmer);
+	}
+	if(opt->out_file) {
+    	fclose(opt->out_file);
+	}
 }
 
 
