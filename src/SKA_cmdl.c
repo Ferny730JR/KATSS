@@ -30,7 +30,7 @@ const char *SKA_args_info_usage = "Usage: SKA [OPTIONS] [<input.fa>] [<bound.fa>
 
 const char *SKA_args_info_versiontext = "";
 
-const char *SKA_args_info_description = "The Streaming K-mer Analysis is a C program designed to analyze RNA sequences\nand identify enriched motifs in protein-bound RNA.\n The program follows a structured pipeline that includes k-mer counting,\nfrequency calculations, and enrichment analysis, producing a CSV file with\nranked k-mers based on their likelihood of being a motif.";
+const char *SKA_args_info_description = "The Streaming K-mer Analysis is a C program designed to analyze RNA sequences\nand identify enriched motifs in protein-bound RNA.\nThe program follows a structured pipeline that includes k-mer counting,\nfrequency calculations, and enrichment analysis, producing a CSV file with\nranked k-mers based on their likelihood of being a motif.";
 
 const char *SKA_args_info_detailed_help[] = {
   "  -h, --help                 Print help and exit",
@@ -50,10 +50,12 @@ const char *SKA_args_info_detailed_help[] = {
   "  ",
   "  -d, --file-delimiter=char  Set the delimiter used to separate the values in\n                               the output file.\n                                 (default=`,')",
   "  The output of SKA by default is in csv format, meaning the values are comma\n  delimited. By specifying this option, you can change the delimiter used to\n  separate the values. The available delimiters are: comma (,), tab ('t'),\n  colon (:), vertical bar (|), and space (\" \") For example, setting\n  `--file-delimiter=\" \"' will change the delimiter to be space  separated.\n  Support for other delimiters is currently unavailable.\n",
+  "      --no-log               Don't normalize enrichments to log2.\n                                 (default=off)",
+  "  The enrichment values produced by SKA are by default normalized to the\n  logarithm base 2. This is done to help visualize the proportional changes\n  between the target and the background data. By toggling this flag, you can\n  get the pure enrichment values rather than the normalized values.\n",
   "\nAlgorithms:",
   "  Select additional algorithms to determine the calculations.\n\n",
   "  -p, --independent-probs    Calculate the enrichments without the input reads.\n                                 (default=off)",
-  "  Detailed description.\n",
+  "  Using the dinucleotide and mononucleotide frequencies of the target data, SKA\n  can make an accurate prediction as to what the enrichment values should be.\n  As such, when computing the actual frequencies for all k-mers, the values\n  that deviate the most from the predictions are the most significant, and are\n  used to discover the motif.\n",
   "      --fmotif=string        Search for a specific fixed motif, rather than all\n                               k-mers.\n",
   "  If this option is provided, the SKA program will search for the specified\n  motif pattern. SKA will find all exact matches in the input and bound files,\n  and get the enrichment of that specific motif.\n",
   "      --motif=pattern        Search for a specific motif, rather than all\n                               k-mers.\n",
@@ -76,15 +78,16 @@ init_help_array(void)
   SKA_args_info_help[9] = SKA_args_info_detailed_help[13];
   SKA_args_info_help[10] = SKA_args_info_detailed_help[15];
   SKA_args_info_help[11] = SKA_args_info_detailed_help[17];
-  SKA_args_info_help[12] = SKA_args_info_detailed_help[18];
-  SKA_args_info_help[13] = SKA_args_info_detailed_help[19];
+  SKA_args_info_help[12] = SKA_args_info_detailed_help[19];
+  SKA_args_info_help[13] = SKA_args_info_detailed_help[20];
   SKA_args_info_help[14] = SKA_args_info_detailed_help[21];
   SKA_args_info_help[15] = SKA_args_info_detailed_help[23];
-  SKA_args_info_help[16] = 0; 
+  SKA_args_info_help[16] = SKA_args_info_detailed_help[25];
+  SKA_args_info_help[17] = 0; 
   
 }
 
-const char *SKA_args_info_help[17];
+const char *SKA_args_info_help[18];
 
 typedef enum {ARG_NO
   , ARG_FLAG
@@ -119,6 +122,7 @@ void clear_given (struct SKA_args_info *args_info)
   args_info->kmer_given = 0 ;
   args_info->iterations_given = 0 ;
   args_info->file_delimiter_given = 0 ;
+  args_info->no_log_given = 0 ;
   args_info->independent_probs_given = 0 ;
   args_info->fmotif_given = 0 ;
   args_info->motif_given = 0 ;
@@ -140,6 +144,7 @@ void clear_args (struct SKA_args_info *args_info)
   args_info->iterations_orig = NULL;
   args_info->file_delimiter_arg = gengetopt_strdup (",");
   args_info->file_delimiter_orig = NULL;
+  args_info->no_log_flag = 0;
   args_info->independent_probs_flag = 0;
   args_info->fmotif_arg = NULL;
   args_info->fmotif_orig = NULL;
@@ -162,11 +167,12 @@ void init_args_info(struct SKA_args_info *args_info)
   args_info->kmer_help = SKA_args_info_detailed_help[11] ;
   args_info->iterations_help = SKA_args_info_detailed_help[13] ;
   args_info->file_delimiter_help = SKA_args_info_detailed_help[15] ;
-  args_info->independent_probs_help = SKA_args_info_detailed_help[19] ;
-  args_info->fmotif_help = SKA_args_info_detailed_help[21] ;
+  args_info->no_log_help = SKA_args_info_detailed_help[17] ;
+  args_info->independent_probs_help = SKA_args_info_detailed_help[21] ;
+  args_info->fmotif_help = SKA_args_info_detailed_help[23] ;
   args_info->fmotif_min = 0;
   args_info->fmotif_max = 0;
-  args_info->motif_help = SKA_args_info_detailed_help[23] ;
+  args_info->motif_help = SKA_args_info_detailed_help[25] ;
   
 }
 
@@ -387,6 +393,8 @@ SKA_cmdline_parser_dump(FILE *outfile, struct SKA_args_info *args_info)
     write_into_file(outfile, "iterations", args_info->iterations_orig, 0);
   if (args_info->file_delimiter_given)
     write_into_file(outfile, "file-delimiter", args_info->file_delimiter_orig, 0);
+  if (args_info->no_log_given)
+    write_into_file(outfile, "no-log", 0, 0 );
   if (args_info->independent_probs_given)
     write_into_file(outfile, "independent-probs", 0, 0 );
   write_multiple_into_file(outfile, args_info->fmotif_given, "fmotif", args_info->fmotif_orig, 0);
@@ -1550,6 +1558,7 @@ SKA_cmdline_parser_internal (
         { "kmer",	1, NULL, 'k' },
         { "iterations",	1, NULL, 'r' },
         { "file-delimiter",	1, NULL, 'd' },
+        { "no-log",	0, NULL, 0 },
         { "independent-probs",	0, NULL, 'p' },
         { "fmotif",	1, NULL, 0 },
         { "motif",	1, NULL, 0 },
@@ -1679,9 +1688,22 @@ SKA_cmdline_parser_internal (
             exit (EXIT_SUCCESS);
           }
 
+          /* Don't normalize enrichments to log2.
+.  */
+          if (strcmp (long_options[option_index].name, "no-log") == 0)
+          {
+          
+          
+            if (update_arg((void *)&(args_info->no_log_flag), 0, &(args_info->no_log_given),
+                &(local_args_info.no_log_given), optarg, 0, 0, ARG_FLAG,
+                check_ambiguity, override, 1, 0, "no-log", '-',
+                additional_error))
+              goto failure;
+          
+          }
           /* Search for a specific fixed motif, rather than all k-mers.
 .  */
-          if (strcmp (long_options[option_index].name, "fmotif") == 0)
+          else if (strcmp (long_options[option_index].name, "fmotif") == 0)
           {
           
             if (update_multiple_arg_temp(&fmotif_list, 

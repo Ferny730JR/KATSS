@@ -9,7 +9,9 @@ version "1.0"
 args "--file-name=SKA_cmdl --include-getopt --default-optional --unamed-opts --func-name=SKA_cmdline_parser --arg-struct-name=SKA_args_info"
 
 description "The Streaming K-mer Analysis is a C program designed to analyze RNA sequences and identify enriched motifs in protein-bound RNA.\n\
- The program follows a structured pipeline that includes k-mer counting, frequency calculations, and enrichment analysis, producing a CSV file with ranked k-mers based on their likelihood of being a motif."
+The program follows a structured pipeline that includes k-mer counting, frequency calculations,\
+ and enrichment analysis, producing a CSV file with ranked k-mers based on their likelihood of\
+ being a motif."
 
 
 section "I/O Options"
@@ -68,13 +70,25 @@ typestr="char"
 default=","
 optional
 
+option "no-log" -
+"Don't normalize enrichments to log2.\n"
+details="The enrichment values produced by SKA are by default normalized to the logarithm base 2.\
+ This is done to help visualize the proportional changes between the target and the background\
+ data. By toggling this flag, you can get the pure enrichment values rather than the normalized\
+ values.\n"
+flag
+off
+
 
 section "Algorithms"
 sectiondesc="Select additional algorithms to determine the calculations.\n\n"
 
 option "independent-probs" p
 "Calculate the enrichments without the input reads.\n"
-details="Detailed description.\n"
+details="Using the dinucleotide and mononucleotide frequencies of the target data, SKA can make\
+ an accurate prediction as to what the enrichment values should be. As such, when computing the\
+ actual frequencies for all k-mers, the values that deviate the most from the predictions are the\
+ most significant, and are used to discover the motif.\n"
 flag
 off
 

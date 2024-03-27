@@ -76,6 +76,10 @@ struct SKA_args_info
  original value given at command line.  */
   const char *file_delimiter_help; /**< @brief Set the delimiter used to separate the values in the output file.
  help description.  */
+  int no_log_flag;	/**< @brief Don't normalize enrichments to log2.
+ (default=off).  */
+  const char *no_log_help; /**< @brief Don't normalize enrichments to log2.
+ help description.  */
   int independent_probs_flag;	/**< @brief Calculate the enrichments without the input reads.
  (default=off).  */
   const char *independent_probs_help; /**< @brief Calculate the enrichments without the input reads.
@@ -106,6 +110,7 @@ struct SKA_args_info
   unsigned int kmer_given ;	/**< @brief Whether kmer was given.  */
   unsigned int iterations_given ;	/**< @brief Whether iterations was given.  */
   unsigned int file_delimiter_given ;	/**< @brief Whether file-delimiter was given.  */
+  unsigned int no_log_given ;	/**< @brief Whether no-log was given.  */
   unsigned int independent_probs_given ;	/**< @brief Whether independent-probs was given.  */
   unsigned int fmotif_given ;	/**< @brief Whether fmotif was given.  */
   unsigned int motif_given ;	/**< @brief Whether motif was given.  */
