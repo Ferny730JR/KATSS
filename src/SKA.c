@@ -323,6 +323,7 @@ process_iteration(options *opt)
 	kmerHashTable *bound_table;
 	kmerHashTable *enrichments_table;
 
+	/* Compute independent SKA analysis (no control) */
 	if(opt->independent_probs) {
 		FrqIndependentProbs kmer_data;
 		kmer_data = process_independent_probs(opt->bound_file, opt);
@@ -332,22 +333,22 @@ process_iteration(options *opt)
 
 		free_kmer_table(kmer_data.monomer_frq);
 		free_kmer_table(kmer_data.dimer_frq);
+
+	/* Compute normal SKA analysis */
 	} else {
 		KmerCounter *input_counts = count_kmers(opt->input_file, opt);
-		opt->input_total = opt->input_total ? opt->input_total : kctr_total(input_counts);
-		input_counts->total_count = opt->input_total;
 		input_table = get_frequencies(input_counts);
 		free_kcounter(input_counts);
 
 		KmerCounter *bound_counts = count_kmers(opt->bound_file, opt);
-		opt->bound_total = opt->bound_total ? opt->bound_total : kctr_total(bound_counts);
-		bound_counts->total_count = opt->bound_total;
 		bound_table = get_frequencies(bound_counts);
 		free_kcounter(bound_counts);
 	}
 
+	/* Function to compute enrichments for all k-mers */
 	enrichments_table = get_enrichment(input_table, bound_table, opt);
 
+	/* Dump information into output file */
 	Entry *max_entry = kmer_max_entry(enrichments_table);
 	entry_to_file(opt->out_file, max_entry, opt->file_delimiter);
 
@@ -731,10 +732,10 @@ get_enrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt)
         bound_values = kmer_get(bound_frq, key);
         input_values = kmer_get(input_frq, key);
 
-        if(bound_values[0] == 0.0f || input_values[0] == 0.0f) {
-            enrichment = 0.0f;
+        if(bound_values[0] == 0.0 || input_values[0] == 0.0) {
+            enrichment = 0.0;
         } else {
-            enrichment = logf(bound_values[0]/input_values[0])/logf(2.0f);
+            enrichment = log2(bound_values[0]/input_values[0]);
         }
         kmer_add_value(enrichments_table, key, enrichment, 0);
     }
