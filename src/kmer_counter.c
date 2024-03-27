@@ -84,24 +84,8 @@ kctr_increment(KmerCounter *kcounter, char *sequence)
 			continue;
 		}
 		kcounter->entries[index]++;
+		kcounter->total_count++;
 	}
-}
-
-
-unsigned long
-kctr_total(KmerCounter *kcounter)
-{
-	if(kcounter->total_count) {
-		return kcounter->total_count;
-	}
-
-	unsigned long total = 0;
-	for(unsigned int i=0; i<kcounter->capacity; i++) {
-		total += kcounter->entries[i];
-	}
-
-	kcounter->total_count = total;
-	return total;
 }
 
 
