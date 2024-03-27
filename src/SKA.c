@@ -4,6 +4,7 @@
 #include <math.h>
 #include <unistd.h>
 #include <float.h>
+#include <stdbool.h>
 #include <errno.h>
 
 #include "rna_file_parser.h"
@@ -21,15 +22,16 @@ typedef struct options {
 	char    *bound_file;
 	char    *out_filename;
 	FILE    *out_file;
-	int     out_given;
+	bool     out_given;
 	int     kmer;
 	int     iterations;
 	char    file_delimiter;
+	bool    no_log;
 
-	int     independent_probs;
+	bool     independent_probs;
 	char    **fmotif;
 	char    *motif;
-	int		num_motifs;
+	int     num_motifs;
 
 	char    **top_kmer;
 	int     cur_iter;
@@ -141,12 +143,13 @@ init_default_options(options *opt)
 	opt->bound_file     = NULL;
 	opt->out_filename   = "motif";
 	opt->out_file       = NULL;
-	opt->out_given      = 0;
+	opt->out_given      = false;
 	opt->kmer           = 3;
 	opt->iterations     = 1;
 	opt->file_delimiter = ',';
+	opt->no_log         = false;
 
-	opt->independent_probs  = 0;
+	opt->independent_probs  = false;
 	opt->fmotif             = NULL;
 	opt->motif              = NULL;
 
@@ -244,8 +247,12 @@ main(int argc, char **argv)
 		opt.file_delimiter = delimiter_to_char(args_info.file_delimiter_arg);
 	}
 
+	if(args_info.no_log_given) {
+		opt.no_log = true;
+	}
+
 	if(args_info.independent_probs_given) {
-		opt.independent_probs = 1;
+		opt.independent_probs = true;
 	}
 
 	if(args_info.fmotif_given) {
@@ -734,6 +741,8 @@ get_enrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt)
 
         if(bound_values[0] == 0.0 || input_values[0] == 0.0) {
             enrichment = 0.0;
+		} else if(opt->no_log) {
+			enrichment = bound_values[0]/input_values[0];
         } else {
             enrichment = log2(bound_values[0]/input_values[0]);
         }
