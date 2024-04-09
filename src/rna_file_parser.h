@@ -58,6 +58,8 @@ char *rnaf_get(RNA_FILE *rna_file);
  *  @param rna_file A pointer to the RNA_FILE struct representing the opened file.
  *  @return A dynamically allocated string containing the sequence, or NULL if there are no more
  *  sequences or an error occurs.
+ * 
+ *  @note Recommend to set the rna_file buffer size to 2048
 */
 char *rnaf_getm(RNA_FILE *rna_file, char *match);
 
