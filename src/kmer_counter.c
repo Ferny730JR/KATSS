@@ -81,6 +81,7 @@ kctr_increment(KmerCounter *kcounter, char *sequence)
 	for(int i=0; i<num_kmers_in_seq; i++) {
 		index = kctr_hash(sequence,i,kcounter->k_mer);
 		if(index == -1) {
+			i += kcounter->k_mer - 1; // shift k-mer, since it currently contains garbage
 			continue;
 		}
 		kcounter->entries[index]++;
