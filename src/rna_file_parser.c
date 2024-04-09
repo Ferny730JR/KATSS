@@ -116,47 +116,64 @@ rnaf_getm(RNA_FILE *rna_file, char *match)
 	char          *line;
 	int            m = strlen(match);
 	int            n = rna_file->buffer_size;
+	int            offset;
 
-	if(n==0) {
+	/* File is empty or match is empty, so dont bother searching */
+	if(n==0 || m==0) {
 		return NULL;
 	}
 
+	/* Pre-processing stage */
 	int badchar[NO_OF_CHARS];
 	badCharHeuristic(match, m, badchar);
+
+	/* Get line match */
 	do {
-	
-	while (rna_file->shift <= (n - m)) {
-		int j = m - 1;
+		/* Search phase */
+		while (rna_file->shift <= (n - m)) {
+			int j = m - 1;
 
-		while (j >= 0 && match[j] == rna_file->buffer[rna_file->shift + j]) {
-			j--;
-		}
-
-		if (j < 0) {
-			ret = getm_line(rna_file->buffer, rna_file->buffer_size, rna_file->shift);
-			if(ret.line) {
-				rna_file->shift += (rna_file->shift + m < n) ? ret.shift : 1;
-				return ret.line;
-			} else {
-				rnaf_oread(rna_file, n - rna_file->shift + 1);
-				rna_file->shift = 0;
+			while (j >= 0 && match[j] == rna_file->buffer[rna_file->shift + j]) {
+				j--;
 			}
-		} else {
-			rna_file->shift+=MAX2(1,j-badchar[(unsigned int)rna_file->buffer[rna_file->shift+j]]);
+
+			if (j < 0) {
+				ret = getm_line(rna_file->buffer, rna_file->buffer_size, rna_file->shift);
+				if(ret.line) {
+					rna_file->shift += (rna_file->shift + m < n) ? ret.shift : 1;
+					return ret.line;
+				} else {
+					offset = n - rna_file->shift + 1;
+					while(rna_file->buffer[n - offset - 1] != '\n') {
+						offset++;
+						if(offset == n-1) {
+							offset = 0;
+							break;
+						}
+					}
+					rnaf_oread(rna_file, offset);
+					// rnaf_oread(rna_file, ret.shift);
+					rna_file->shift = offset - (n - rna_file->shift);
+				}
+			} else {
+				rna_file->shift+=MAX2(1,j-badchar[(unsigned int)rna_file->buffer[rna_file->shift+j]]);
+			}
 		}
-	}
 
-	int offset = 0;
-	while(rna_file->buffer[rna_file->buffer_size-offset-1] != '\n') {
-		offset++;
-	}
+		/* Match not found in buffer, refill it */
+		offset = 0;
+		while(rna_file->buffer[n-offset-1] != '\n') {
+			offset++;
+			if(offset == n-1) {
+				offset = 0;
+				break;
+			}
+		}
 
-	rna_file->shift = 0;
-	still_reading = rnaf_oread(rna_file, offset);
+		rna_file->shift = 0; // reset shift
+		still_reading = rnaf_oread(rna_file, offset); // fill buffer & keep previous last line
 
 	} while(still_reading);
-
-	printf("NOT FOUND ABORT\n");
 
 	return NULL;
 }
@@ -419,10 +436,11 @@ getm_line(char *search, unsigned int search_len, unsigned int found_at) {
 	}
 
 	while(search[line_start+line_length] != '\n') {
-		if(search[line_start+line_length] == '\0' || line_start+line_length>65536) {
+		line_length++;
+		if(search[line_start+line_length] == '\0' || line_start+line_length>search_len) {
+			info.shift = search_len - line_start;
 			return info;
 		}
-		line_length++;
 	}
 
 	info.shift = line_length - (found_at - line_start);
