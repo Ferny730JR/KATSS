@@ -16,6 +16,7 @@ typedef struct RNA_FILE {
 	unsigned int buffer_size;       /** Int to store the size of the buffer.  */
 	unsigned long num_chars;        /** Number to store the total number of chars in file. */
 	unsigned long num_lines;        /** Number to store the total number of lines in file. */
+	unsigned int shift;				/** Number to store the shift in string search */
     char filetype;                  /** Character to store which file type was passed. */
 } RNA_FILE;
 
@@ -49,6 +50,16 @@ RNA_FILE *rnaf_open(char *filename);
  *  sequences or an error occurs.
  */
 char *rnaf_get(RNA_FILE *rna_file);
+
+
+/**
+ *  @brief Retrieves the next sequence that contain the string match within it.
+ * 
+ *  @param rna_file A pointer to the RNA_FILE struct representing the opened file.
+ *  @return A dynamically allocated string containing the sequence, or NULL if there are no more
+ *  sequences or an error occurs.
+*/
+char *rnaf_getm(RNA_FILE *rna_file, char *match);
 
 
 /**
