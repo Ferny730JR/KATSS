@@ -8,7 +8,13 @@
 #include "string_utils.h"
 #include "utils.h"
 
-#define NO_OF_CHARS 256
+#define NO_OF_CHARS 16
+
+/* Struct to contain getm information */
+typedef struct getm_line_info {
+	int shift;
+	char *line;
+} getm_line_info;
 
 /* Function declarations */
 static void
@@ -19,6 +25,9 @@ parse_fastq(RNA_FILE *rna_file, char **ret_seq);
 
 static void
 parse_reads(RNA_FILE *rna_file, char **ret_seq);
+
+static getm_line_info
+getm_line(char *search, unsigned int search_len, unsigned int found_at);
 
 static char
 determine_filetype(char peek);
@@ -47,6 +56,7 @@ rnaf_open(char* filename)
 	rna_file->buffer_size = MAX_SEQ_LENGTH;
 	rna_file->num_chars = 0;
 	rna_file->num_lines = 0;
+	rna_file->shift = 0;
 	memset(rna_file->buffer, 0, MAX_SEQ_LENGTH * sizeof(char)); // init buffer to '\0'
 
 	/* Check if we can open file for reading */
@@ -98,6 +108,60 @@ rnaf_get(RNA_FILE *rna_file)
 }
 
 
+char *
+rnaf_getm(RNA_FILE *rna_file, char *match)
+{
+	getm_line_info ret;
+	size_t         still_reading = 0;
+	char          *line;
+	int            m = strlen(match);
+	int            n = rna_file->buffer_size;
+
+	if(n==0) {
+		return NULL;
+	}
+
+	int badchar[NO_OF_CHARS];
+	badCharHeuristic(match, m, badchar);
+	do {
+	
+	while (rna_file->shift <= (n - m)) {
+		int j = m - 1;
+
+		while (j >= 0 && match[j] == rna_file->buffer[rna_file->shift + j]) {
+			j--;
+		}
+
+		if (j < 0) {
+			ret = getm_line(rna_file->buffer, rna_file->buffer_size, rna_file->shift);
+			if(ret.line) {
+				rna_file->shift += (rna_file->shift + m < n) ? ret.shift : 1;
+				return ret.line;
+			} else {
+				rnaf_oread(rna_file, n - rna_file->shift + 1);
+				rna_file->shift = 0;
+			}
+		} else {
+			rna_file->shift+=MAX2(1,j-badchar[(unsigned int)rna_file->buffer[rna_file->shift+j]]);
+		}
+	}
+
+	int offset = 0;
+	while(rna_file->buffer[rna_file->buffer_size-offset-1] != '\n') {
+		offset++;
+	}
+
+	rna_file->shift = 0;
+	still_reading = rnaf_oread(rna_file, offset);
+
+	} while(still_reading);
+
+	printf("NOT FOUND ABORT\n");
+
+	return NULL;
+}
+
+
 size_t 
 rnaf_oread(RNA_FILE *rna_file, unsigned int offset)
 {
@@ -115,7 +179,11 @@ rnaf_oread(RNA_FILE *rna_file, unsigned int offset)
 	}
 
 	/* EOF has been reached, fill unfilled buffer with NULL */
-	memset(rna_file->buffer+offset+ret, 0, (rna_file->buffer_size-(offset+ret))*sizeof(char));
+	if(ret > 0) {
+		memset(rna_file->buffer+offset+ret, 0, (rna_file->buffer_size-(offset+ret))*sizeof(char));
+	} else { /* Nothing left to read, empty buffer */
+		memset(rna_file->buffer, 1, rna_file->buffer_size*sizeof(char));
+	}
 	return ret;
 }
 
@@ -221,7 +289,7 @@ rnaf_numlines(RNA_FILE *rna_file)
 
 	FILE *fp = fopen(rna_file->filename, "r");
 	if(fp == NULL) {
-		error_message("rnaf Failed get numchars: %s", strerror(errno));
+		error_message("rnaf Failed get numlines: %s", strerror(errno));
 		return 0;
 	}
 
@@ -282,9 +350,12 @@ parse_fastq(RNA_FILE *rna_file, char **ret_seq)
 {
 	char            *seq = NULL; /* Init seq, will be realloc'd based on input stream */
 	unsigned int    reading_seq = 1;
+	unsigned int	current_iter = 0;
 
 	while(fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file)) {
-		if(rna_file->buffer[0] == '@') {
+		current_iter+=1;
+
+		if(rna_file->buffer[0] == '@' && current_iter == 4) {
 			/* If buffer wasn't large enough to store header, keep reading */
 			while(is_full(rna_file->buffer, rna_file->buffer_size)) {
 				fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file);
@@ -330,6 +401,34 @@ parse_reads(RNA_FILE *rna_file, char **ret_seq)
 
 	/* Have ret_seq point to new seq */
 	*ret_seq = seq;
+}
+
+
+static getm_line_info
+getm_line(char *search, unsigned int search_len, unsigned int found_at) {
+	unsigned int line_start = found_at;
+	unsigned int line_length = 1;
+
+	getm_line_info info = {.shift = 0, .line=NULL};
+
+	while(search[line_start-1] != '\n') {
+		line_start--;
+		if(line_start == 0) {
+			break;
+		}
+	}
+
+	while(search[line_start+line_length] != '\n') {
+		if(search[line_start+line_length] == '\0' || line_start+line_length>65536) {
+			return info;
+		}
+		line_length++;
+	}
+
+	info.shift = line_length - (found_at - line_start);
+	info.line = substr(search, line_start, line_length);
+
+	return info;
 }
 
 
