@@ -55,6 +55,7 @@ rnaf_open(char* filename)
 	rna_file->filename = filename;
 	rna_file->buffer = s_malloc(MAX_SEQ_LENGTH * sizeof(char));
 	rna_file->buffer_size = MAX_SEQ_LENGTH;
+	rna_file->getm_ptr = NULL;
 	rna_file->num_chars = 0;
 	rna_file->num_lines = 0;
 	memset(rna_file->buffer, 0, MAX_SEQ_LENGTH * sizeof(char)); // init buffer to '\0'
@@ -112,32 +113,36 @@ char *
 rnaf_getm(RNA_FILE *rna_file, char *match)
 {
 	getm_line_info ret;
-	size_t still_reading = 0;
-	unsigned int position;
+	size_t         still_reading;
+	unsigned int   position;
+
+	if(rna_file->getm_ptr == NULL) {
+		rna_file->getm_ptr = rna_file->buffer;
+	}
 
 	do {
-		char *result = rna_file->buffer;
-
-		while((result = strstr(result, match)) != NULL) {
-			position = result - rna_file->buffer;
+		while((rna_file->getm_ptr = strstr(rna_file->getm_ptr, match)) != NULL) {
+			position = rna_file->getm_ptr - rna_file->buffer;
 
 			/* Get the line that the match is part of */
 			ret = getm_line(rna_file->buffer, rna_file->buffer_size, position);
 
 			/* If the full line exists in buffer, great */
-			if(ret.end_line) {
-				result = ret.end_line;
+			if(ret.beginning_line) {
+				rna_file->getm_ptr = ret.end_line;
+				return ret.beginning_line;
 			
 			/* If full line is not in buffer, refill buffer starting with current line info */
 			} else { 
 				rnaf_oread(rna_file, ret.shift);
-				result = rna_file->buffer;
+				rna_file->getm_ptr = rna_file->buffer;
 			}
 		}
 
 		/* Search for the beginning of the current line, in case it is not fully read */
-		unsigned int offset = 0;
-		while(rna_file->buffer[rna_file->buffer_size-offset-1] != '\0') {
+		unsigned int offset = 1;
+		while(rna_file->buffer[rna_file->buffer_size-offset] != '\0' &&
+		      rna_file->buffer[rna_file->buffer_size-offset] != '\n') {
 			offset++;
 			if(offset == rna_file->buffer_size-1) {
 				offset = 0;
@@ -145,7 +150,8 @@ rnaf_getm(RNA_FILE *rna_file, char *match)
 			}
 		}
 
-		still_reading = rnaf_oread(rna_file, offset);
+		still_reading = rnaf_oread(rna_file, offset-1);
+		rna_file->getm_ptr = rna_file->buffer;
 	} while (still_reading);
 
 	/* match not found in RNA_FILE, return NULL */
@@ -402,7 +408,7 @@ getm_line(char *search, unsigned int search_len, unsigned int found_at)
 
 	/* Search for the beginning of the line */
 	unsigned int line_start = found_at;
-	while(search[--line_start] != '\n' && search[line_start] != '\0' && line_start);
+	while(line_start && search[--line_start] != '\n' && search[line_start] != '\0');
 	line_start += line_start ? 1 : 0;
 
 	/* Search for the end of the line */
