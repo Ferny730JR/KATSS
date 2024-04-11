@@ -8,12 +8,13 @@
 #include "string_utils.h"
 #include "utils.h"
 
-#define NO_OF_CHARS 16
+#define NO_OF_CHARS 256
 
 /* Struct to contain getm information */
 typedef struct getm_line_info {
 	int shift;
-	char *line;
+	char *beginning_line;
+	char *end_line;
 } getm_line_info;
 
 /* Function declarations */
@@ -56,7 +57,6 @@ rnaf_open(char* filename)
 	rna_file->buffer_size = MAX_SEQ_LENGTH;
 	rna_file->num_chars = 0;
 	rna_file->num_lines = 0;
-	rna_file->shift = 0;
 	memset(rna_file->buffer, 0, MAX_SEQ_LENGTH * sizeof(char)); // init buffer to '\0'
 
 	/* Check if we can open file for reading */
@@ -112,69 +112,43 @@ char *
 rnaf_getm(RNA_FILE *rna_file, char *match)
 {
 	getm_line_info ret;
-	size_t         still_reading = 0;
-	char          *line;
-	int            m = strlen(match);
-	int            n = rna_file->buffer_size;
-	int            offset;
+	size_t still_reading = 0;
+	unsigned int position;
 
-	/* File is empty or match is empty, so dont bother searching */
-	if(n==0 || m==0) {
-		return NULL;
-	}
-
-	/* Pre-processing stage */
-	int badchar[NO_OF_CHARS];
-	badCharHeuristic(match, m, badchar);
-
-	/* Get line match */
 	do {
-		/* Search phase */
-		while (rna_file->shift <= (n - m)) {
-			int j = m - 1;
+		char *result = rna_file->buffer;
 
-			while (j >= 0 && match[j] == rna_file->buffer[rna_file->shift + j]) {
-				j--;
-			}
+		while((result = strstr(result, match)) != NULL) {
+			position = result - rna_file->buffer;
 
-			if (j < 0) {
-				ret = getm_line(rna_file->buffer, rna_file->buffer_size, rna_file->shift);
-				if(ret.line) {
-					rna_file->shift += (rna_file->shift + m < n) ? ret.shift : 1;
-					return ret.line;
-				} else {
-					offset = n - rna_file->shift + 1;
-					while(rna_file->buffer[n - offset - 1] != '\n') {
-						offset++;
-						if(offset == n-1) {
-							offset = 0;
-							break;
-						}
-					}
-					rnaf_oread(rna_file, offset);
-					// rnaf_oread(rna_file, ret.shift);
-					rna_file->shift = offset - (n - rna_file->shift);
-				}
-			} else {
-				rna_file->shift+=MAX2(1,j-badchar[(unsigned int)rna_file->buffer[rna_file->shift+j]]);
+			/* Get the line that the match is part of */
+			ret = getm_line(rna_file->buffer, rna_file->buffer_size, position);
+
+			/* If the full line exists in buffer, great */
+			if(ret.end_line) {
+				result = ret.end_line;
+			
+			/* If full line is not in buffer, refill buffer starting with current line info */
+			} else { 
+				rnaf_oread(rna_file, ret.shift);
+				result = rna_file->buffer;
 			}
 		}
 
-		/* Match not found in buffer, refill it */
-		offset = 0;
-		while(rna_file->buffer[n-offset-1] != '\n') {
+		/* Search for the beginning of the current line, in case it is not fully read */
+		unsigned int offset = 0;
+		while(rna_file->buffer[rna_file->buffer_size-offset-1] != '\0') {
 			offset++;
-			if(offset == n-1) {
+			if(offset == rna_file->buffer_size-1) {
 				offset = 0;
 				break;
 			}
 		}
 
-		rna_file->shift = 0; // reset shift
-		still_reading = rnaf_oread(rna_file, offset); // fill buffer & keep previous last line
+		still_reading = rnaf_oread(rna_file, offset);
+	} while (still_reading);
 
-	} while(still_reading);
-
+	/* match not found in RNA_FILE, return NULL */
 	return NULL;
 }
 
@@ -422,30 +396,31 @@ parse_reads(RNA_FILE *rna_file, char **ret_seq)
 
 
 static getm_line_info
-getm_line(char *search, unsigned int search_len, unsigned int found_at) {
+getm_line(char *search, unsigned int search_len, unsigned int found_at) 
+{
+	getm_line_info info = {.shift = 0, .beginning_line = NULL, .end_line = NULL};
+
+	/* Search for the beginning of the line */
 	unsigned int line_start = found_at;
-	unsigned int line_length = 1;
+	while(search[--line_start] != '\n' && search[line_start] != '\0' && line_start);
+	line_start += line_start ? 1 : 0;
 
-	getm_line_info info = {.shift = 0, .line=NULL};
+	/* Search for the end of the line */
+	char *begin_line = search+line_start;
+	char *end_line = strchr(search+found_at, '\n');
 
-	while(search[line_start-1] != '\n') {
-		line_start--;
-		if(line_start == 0) {
-			break;
-		}
+	/* If end of line is not found, return NULL */
+	if(end_line == NULL) {
+		info.shift = strlen(begin_line);
+		return info;
 	}
 
-	while(search[line_start+line_length] != '\n') {
-		line_length++;
-		if(search[line_start+line_length] == '\0' || line_start+line_length>search_len) {
-			info.shift = search_len - line_start;
-			return info;
-		}
-	}
+	/* Set newline to \0 to turn found line into C string */
+	end_line[0] = '\0';
 
-	info.shift = line_length - (found_at - line_start);
-	info.line = substr(search, line_start, line_length);
-
+	/* Set pointers for start of line and end of line */
+	info.beginning_line = begin_line;
+	info.end_line = end_line+1;
 	return info;
 }
 
