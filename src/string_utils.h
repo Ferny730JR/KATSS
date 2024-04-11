@@ -22,6 +22,22 @@ char *substr(const char *sequence, const int start, const int length);
 
 
 /**
+ *  @brief Searches for the first occurrence of the character `match` in the string pointed
+ *  by the argument `str` of size `strsize`.
+ * 
+ *  This function is useful when searching for a character in a non-null terminating string.
+ * 
+ *  @param str The string the search in
+ *  @param strsize The number of characters in the string
+ *  @param match the character to search for
+ * 
+ *  @return Pointer to the first occurrence of the character `match` in the string `str`, or `NULL`
+ *  if the character is not found
+*/
+char *strnchr(const char *str, size_t strsize, const char match);
+
+
+/**
  *  @brief Get the basename prefix of a file path.
  * 
  *  This function removes all characters before the last occurrence of the character `/`, and all

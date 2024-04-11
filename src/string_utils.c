@@ -35,6 +35,17 @@ char* substr(const char *sequence, const int start, const int length) {
 }
 
 
+char *strnchr(const char *str, size_t strsize, const char match) {
+	for(size_t i=0; i<strsize; i++) {
+		if(*str == match) {
+			return (char *)str;
+		}
+		++str;
+	}
+	return NULL;
+}
+
+
 char *basename_prefix(const char *file_path) {
     char *basename = strrchr(file_path, '/');
     basename++; // Move pointer to remove trailing '/'
