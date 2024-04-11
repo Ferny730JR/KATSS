@@ -13,10 +13,10 @@ typedef struct RNA_FILE {
     FILE *file;                     /** File pointer for the RNA file. */
 	char *filename;                 /** String storing the name of the opened file. */
     char *buffer;                   /** Character buffer to store sequence data. */
+	char *getm_ptr;                 /** Pointer that keeps track of the last position in buffer */
 	unsigned int buffer_size;       /** Int to store the size of the buffer.  */
 	unsigned long num_chars;        /** Number to store the total number of chars in file. */
 	unsigned long num_lines;        /** Number to store the total number of lines in file. */
-	unsigned int shift;				/** Number to store the shift in string search */
     char filetype;                  /** Character to store which file type was passed. */
 } RNA_FILE;
 
