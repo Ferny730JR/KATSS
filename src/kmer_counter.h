@@ -39,7 +39,17 @@ void free_kcounter(KmerCounter *kmer_counter);
  * @param kcounter Pointer to the KmerCounter structure.
  * @param sequence Input sequence to process.
  */
-void kctr_increment(KmerCounter *kcounter, char *sequence);
+void kctr_increment(KmerCounter *kcounter, const char *sequence);
+
+
+/**
+ * @brief Decrements the the counts of all k-mers affected by the k-mer pat
+ * 
+ * @param kcounter Pointer to the KmerCounter structure.
+ * @param sequence Input sequence to process.
+ * @param pat k-mer pattern to decrement from.
+*/
+void kctr_decrement(KmerCounter *kcounter, const char *sequence, const char *pat);
 
 
 /**
@@ -65,6 +75,18 @@ void kctr_increment_substr(KmerCounter *kmer_counter, char *sequence,
  * @return The count of the specified k-mer.
  */
 unsigned int kctr_get(KmerCounter *kmer_counter, char *key);
+
+
+/**
+ * @brief Empties the specific key.
+ * 
+ * If any counts were associated with the given key, it resets it and sets
+ * the counts to 0.
+ * 
+ * @param kmer_counter Pointer to the KmerCounter structure.
+ * @param key The k-mer key to empty
+*/
+void kctr_empty(KmerCounter *kmer_counter, char *key);
 
 
 /**
