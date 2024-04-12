@@ -28,7 +28,7 @@ static void
 parse_reads(RNA_FILE *rna_file, char **ret_seq);
 
 static getm_line_info
-getm_line(char *search, unsigned int search_len, unsigned int found_at);
+getm_line(char *search, unsigned int found_at);
 
 static char
 determine_filetype(char peek);
@@ -125,7 +125,7 @@ rnaf_getm(RNA_FILE *rna_file, char *match)
 			position = rna_file->getm_ptr - rna_file->buffer;
 
 			/* Get the line that the match is part of */
-			ret = getm_line(rna_file->buffer, rna_file->buffer_size, position);
+			ret = getm_line(rna_file->buffer, position);
 
 			/* If the full line exists in buffer, great */
 			if(ret.beginning_line) {
@@ -402,7 +402,7 @@ parse_reads(RNA_FILE *rna_file, char **ret_seq)
 
 
 static getm_line_info
-getm_line(char *search, unsigned int search_len, unsigned int found_at) 
+getm_line(char *search, unsigned int found_at) 
 {
 	getm_line_info info = {.shift = 0, .beginning_line = NULL, .end_line = NULL};
 
