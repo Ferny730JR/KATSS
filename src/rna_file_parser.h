@@ -53,27 +53,33 @@ char *rnaf_get(RNA_FILE *rna_file);
 
 
 /**
- *  @brief Retrieves the next sequence that contain the string match within it.
+ *  @brief Retrieves the next sequence that contains the string `match` within it.
  * 
  *  @param rna_file A pointer to the RNA_FILE struct representing the opened file.
- *  @return A dynamically allocated string containing the sequence, or NULL if there are no more
+ *  @param match The string to search for.
+ * 
+ *  @return A string of the matched sequence, or NULL if there are no more
  *  sequences or an error occurs.
  * 
- *  @note Recommend to set the rna_file buffer size to 2048
+ *  @note Recommend to set the rna_file buffer size to 65536
 */
 char *rnaf_getm(RNA_FILE *rna_file, char *match);
 
 
 /**
  *  @brief Read from the file until buffer is full.
- * 
+ *
  *  Fills the first offset number of characters of the buffer with the last offset
  *  number of characters of the previous buffer. After which, the rest of the buffer is filled
  *  with the new reads.
- * 
+ *
+ *  For example, Let's assume you had a file with the line: `"Hello, world! How are you?"`, and the
+ *  current buffer of size 13 was filled with `"Hello, world!"`. Calling `rnaf_oread(rna_file, 6)`
+ *  would set the new buffer as: `"world! How ar"`.
+ *
  *  @param rna_file A pointer to the RNA_FILE struct representing the opened file
  *  @param offset The number of characters to read from the previous buffer
- * 
+ *
  *  @return Total number of elements successfully read
 */
 size_t rnaf_oread(RNA_FILE *rna_file, unsigned int offset);
@@ -138,4 +144,4 @@ rnaf_numchars(RNA_FILE *rna_file);
 unsigned long
 rnaf_numlines(RNA_FILE *rna_file);
 
-#endif // FILE_PARSER
+#endif // RNA_FILE_PARSER
