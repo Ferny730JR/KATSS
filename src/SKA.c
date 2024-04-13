@@ -17,6 +17,12 @@
 #include "SKA_cmdl.h"
 
 
+typedef struct {
+	KmerCounter *input_counter;
+	KmerCounter *bound_counter;
+} kcounts;
+
+
 typedef struct options {
 	char    *input_file;
 	char    *bound_file;
@@ -28,7 +34,7 @@ typedef struct options {
 	char    file_delimiter;
 	bool    no_log;
 
-	bool     independent_probs;
+	bool    independent_probs;
 	char    **fmotif;
 	char    *motif;
 	int     num_motifs;
@@ -38,6 +44,8 @@ typedef struct options {
 
 	unsigned long input_total;
 	unsigned long bound_total;
+
+	kcounts kmer_counts;
 } options;
 
 
@@ -52,11 +60,15 @@ typedef struct {
 #  Function Declarations                                   #
 ##########################################################*/
 
+/* SKA functions */
 void 
 process_iteration(options *opt);
 
 KmerCounter *
 count_kmers(char *filename, options *opt);
+
+void
+uncount_kmers(KmerCounter *counter, char *filename, options *opt);
 
 FrqIndependentProbs
 process_independent_probs(char *filename, options *opt);
@@ -64,12 +76,20 @@ process_independent_probs(char *filename, options *opt);
 kmerHashTable *
 predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer);
 
+kmerHashTable *
+get_frequencies(KmerCounter *counts);
+
+kmerHashTable *
+get_enrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt);
+
+/* fmotif functions */
 void
 process_fmotifs(options *opt);
 
 uint64_t
 count_fmotifs(char *filename, char *fmotif);
 
+/* motif pattern search functions */
 void
 process_motifs(options *opt);
 
@@ -81,12 +101,6 @@ count_motifs(char *filename, char *pattern);
 
 void
 process_motif_match(RegexCluster *cluster, Matcher matcher, char *search);
-
-kmerHashTable *
-get_frequencies(KmerCounter *counts);
-
-kmerHashTable *
-get_enrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt);
 
 void
 get_cluster_frequencies(RegexCluster *cluster);
@@ -110,6 +124,7 @@ void
 get_pos_enrichments(BinsLenInfo *enr_len, BinsLenInfo in_len, 
                     BinsLenInfo bo_len, uint16_t num_pos);
 
+/* Helper functions */
 Entry *
 kmer_max_entry(kmerHashTable *hash_table);
 
@@ -158,6 +173,9 @@ init_default_options(options *opt)
 
 	opt->input_total    = 0;
 	opt->bound_total    = 0;
+
+	opt->kmer_counts.bound_counter = NULL;
+	opt->kmer_counts.input_counter = NULL;
 }
 
 
@@ -214,7 +232,7 @@ main(int argc, char **argv)
 	}
 
 	if(args_info.output_given) {
-		opt.out_given    = 1;
+		opt.out_given    = true;
 		opt.out_filename = strdup(args_info.output_arg);
 	}
 
@@ -343,13 +361,15 @@ process_iteration(options *opt)
 
 	/* Compute normal SKA analysis */
 	} else {
-		KmerCounter *input_counts = count_kmers(opt->input_file, opt);
-		input_table = get_frequencies(input_counts);
-		free_kcounter(input_counts);
-
-		KmerCounter *bound_counts = count_kmers(opt->bound_file, opt);
-		bound_table = get_frequencies(bound_counts);
-		free_kcounter(bound_counts);
+		if(opt->cur_iter == 0) { // first iteration, count kmers
+			opt->kmer_counts.input_counter = count_kmers(opt->input_file, opt);
+			opt->kmer_counts.bound_counter = count_kmers(opt->bound_file, opt);
+		} else { // second iteration onwards, remove the previously counter kmers
+			uncount_kmers(opt->kmer_counts.input_counter, opt->input_file, opt);
+			uncount_kmers(opt->kmer_counts.bound_counter, opt->bound_file, opt);
+		}
+		input_table = get_frequencies(opt->kmer_counts.input_counter);
+		bound_table = get_frequencies(opt->kmer_counts.bound_counter);
 	}
 
 	/* Function to compute enrichments for all k-mers */
@@ -376,14 +396,14 @@ count_kmers(char *filename, options *opt)
 	KmerCounter *counter = init_kcounter(opt->kmer);
 
 	char *sequence;
-	while(1) {
+	while(true) {
 		sequence = rnaf_get(read_file);
 
 		if(sequence == NULL) {
 			break;
 		}
 
-		clean_seq(sequence, 1);
+		clean_seq(sequence, 0);
 		for(int i=0; i<opt->cur_iter; i++) {
 			cross_out(sequence, opt->top_kmer[i]);
 		}
@@ -394,6 +414,32 @@ count_kmers(char *filename, options *opt)
 	rnaf_close(read_file);
 
 	return counter;
+}
+
+
+void
+uncount_kmers(KmerCounter *counter, char *filename, options *opt)
+{
+	RNA_FILE *read_file = rnaf_open(filename);
+	char     *top_kmer  = opt->top_kmer[opt->cur_iter-1];
+	rnaf_rebuff(read_file, 65536); /* increase buffer size to make getm faster */
+
+	char *sequence;
+	while (true) {
+		sequence = rnaf_getm(read_file, top_kmer);
+
+		if(sequence == NULL) {
+			break;
+		}
+
+		clean_seq(sequence, 0);
+		for(int i=0; i<opt->cur_iter-1; i++) {
+			cross_out(sequence, opt->top_kmer[i]);
+		}
+
+		kctr_decrement(counter, sequence, top_kmer);
+	}
+	rnaf_close(read_file);
 }
 
 
