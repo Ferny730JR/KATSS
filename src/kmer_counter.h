@@ -6,6 +6,7 @@ typedef struct KmerCounter {
 	unsigned int capacity;      /**< Capacity of the k-mer counter (4^k_mer). */
 	unsigned int *entries;      /**< Array to store counts of each k-mer. */
 	unsigned long total_count;
+	unsigned int nucleotide_to_number[256];
 } KmerCounter;
 
 
@@ -40,6 +41,21 @@ void free_kcounter(KmerCounter *kmer_counter);
  * @param sequence Input sequence to process.
  */
 void kctr_increment(KmerCounter *kcounter, const char *sequence);
+
+
+/**
+ * @brief Increments k-mer counts for all substrings in a given sequence.
+ * 
+ * Nearly the same as kctr_increment but faster by using a rolling hash. The drawback is if it
+ * encounters a non-nucleotide character, the rolling hash will not work as intended. As such,
+ * you should only use this on sequences you know will only contain the characters ATCG.
+ * 
+ * @note Use for sequences containing only `ACTGU` characters.
+ * 
+ * @param kcounter Pointer to the KmerCounter structure.
+ * @param sequence Input sequence to process.
+*/
+void kctr_fincrement(KmerCounter *kcounter, const char *sequence);
 
 
 /**
