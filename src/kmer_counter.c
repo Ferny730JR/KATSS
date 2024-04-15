@@ -11,6 +11,8 @@ typedef struct {
 	int start;
 } DecrementValues;
 
+/* Function declarations */
+static void initialize_mapping(KmerCounter *kcounter);
 
 KmerCounter *
 init_kcounter(unsigned int k_mer) 
@@ -20,6 +22,7 @@ init_kcounter(unsigned int k_mer)
 	kctr->capacity = 1 << (2 * k_mer);   // 4^k_mer
 	kctr->entries = s_calloc(kctr->capacity, sizeof(unsigned int));
 	kctr->total_count = 0;
+	initialize_mapping(kctr);
 
 	return kctr;
 }
@@ -96,6 +99,27 @@ kctr_increment(KmerCounter *kcounter, const char *sequence)
 }
 
 
+void
+kctr_fincrement(KmerCounter *kcounter, const char *sequence)
+{
+	int sequence_length = strlen(sequence);
+	int k = kcounter->k_mer;
+	unsigned int word_mask = (1 << 2*k) - 1;
+
+	unsigned int hash_value = kctr_hash(sequence, 0, k);
+	kcounter->entries[hash_value]++;
+	kcounter->total_count++;
+
+	for (int i = k; i < sequence_length; i++) {
+		unsigned int x = kcounter->nucleotide_to_number[(unsigned char)sequence[i]];
+		hash_value = ((hash_value << 2) | x) & word_mask;
+        
+		kcounter->entries[hash_value]++;
+		kcounter->total_count++;
+    }
+}
+
+
 static DecrementValues
 decrement_kmer(KmerCounter *kcounter, const char *sequence, 
                const char *pat, int min_start, int max_end)
@@ -111,7 +135,7 @@ decrement_kmer(KmerCounter *kcounter, const char *sequence,
 	end = end > max_end ? max_end : end;
 
 	int start = pat_indx - kcounter->k_mer + 1;
-	start = start < min_start ? min_start : pat_indx - kcounter->k_mer + 1; 
+	start = start < min_start ? min_start : start; 
 
 	long index;
 	while(start < end) {
@@ -172,4 +196,28 @@ char *
 kctr_get_key(KmerCounter *kmer_counter, unsigned int index) 
 {
 	return kctr_unhash(index, kmer_counter->k_mer);
+}
+
+// Function to initialize the nucleotide_to_number array
+static void
+initialize_mapping(KmerCounter *kcounter)
+{
+    // Initialize all elements to 0
+    for (int i = 0; i < 256; i++) {
+        kcounter->nucleotide_to_number[i] = (unsigned int)0;
+    }
+    
+    // Assign values for nucleotides
+    kcounter->nucleotide_to_number['A'] = (unsigned int)0;
+    kcounter->nucleotide_to_number['C'] = (unsigned int)1;
+    kcounter->nucleotide_to_number['G'] = (unsigned int)2;
+    kcounter->nucleotide_to_number['T'] = (unsigned int)3;
+	kcounter->nucleotide_to_number['U'] = (unsigned int)3;
+    
+    // Handling for lowercase nucleotides
+    kcounter->nucleotide_to_number['a'] = (unsigned int)0;
+    kcounter->nucleotide_to_number['c'] = (unsigned int)1;
+    kcounter->nucleotide_to_number['g'] = (unsigned int)2;
+    kcounter->nucleotide_to_number['t'] = (unsigned int)3;
+	kcounter->nucleotide_to_number['u'] = (unsigned int)3;
 }
