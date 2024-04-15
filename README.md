@@ -1,3 +1,7 @@
+<p align="center">
+	<img src="./res/KATSS_logo.png" alt="KATSS Logo of a blue cat with a RNA-shaped tail." width="300">
+</p>
+
 # KATSS - K-mer Analysis Tools for Sequence and Structure
 
 A C package containing programs to analyze RNA-protein interaction.
