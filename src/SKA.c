@@ -408,7 +408,7 @@ count_kmers(char *filename, options *opt)
 			cross_out(sequence, opt->top_kmer[i]);
 		}
 
-		kctr_increment(counter, sequence);
+		kctr_fincrement(counter, sequence);
 		free(sequence);
 	}
 	rnaf_close(read_file);
