@@ -1,8 +1,8 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
+#include <zlib.h>
 
 #include "rna_file_parser.h"
 #include "string_utils.h"
@@ -51,7 +51,7 @@ RNA_FILE *
 rnaf_open(char* filename) 
 {
 	RNA_FILE *rna_file = s_malloc(sizeof *rna_file);
-	rna_file->file = fopen(filename, "r");
+	rna_file->file = gzopen(filename, "r");
 	rna_file->filename = filename;
 	rna_file->buffer = s_malloc(MAX_SEQ_LENGTH * sizeof(char));
 	rna_file->buffer_size = MAX_SEQ_LENGTH;
@@ -69,8 +69,8 @@ rnaf_open(char* filename)
 	}
 
 	/* Check if file contains a valid line */
-	if(!fgets(rna_file->buffer, MAX_SEQ_LENGTH, rna_file->file)) { 
-		fclose(rna_file->file);
+	if(!gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size)) {
+		gzclose(rna_file->file);
 		free(rna_file->buffer);
 		free(rna_file);
 		warning_message("File '%s' contains no sequences.",filename);
@@ -82,7 +82,7 @@ rnaf_open(char* filename)
 
 	/* Reset the file to read from beginning */
 	if(rna_file->filetype == 'r') {
-		rewind(rna_file->file);
+		gzrewind(rna_file->file);
 	}
 
 	return rna_file;
@@ -169,7 +169,7 @@ rnaf_oread(RNA_FILE *rna_file, unsigned int offset)
 
 	size_t len, ret;
 	len = rna_file->buffer_size - offset;
-	ret = fread(rna_file->buffer+offset, 1, len, rna_file->file);
+	ret = gzfread(rna_file->buffer+offset, sizeof(char), len, rna_file->file);
 
 	if(len == ret) {
 		return ret;
@@ -188,7 +188,7 @@ rnaf_oread(RNA_FILE *rna_file, unsigned int offset)
 void 
 rnaf_close(RNA_FILE *rna_file) 
 {
-	fclose(rna_file->file);
+	gzclose(rna_file->file);
 	free(rna_file->buffer);
 	free(rna_file);
 }
@@ -199,7 +199,7 @@ rnaf_rebuff(RNA_FILE *rna_file, unsigned int size)
 {
 	rna_file->buffer = s_realloc(rna_file->buffer, size+1);
 	rna_file->buffer_size = size;
-	rewind(rna_file->file);
+	gzrewind(rna_file->file);
 	memset(rna_file->buffer, 0, (size+1) * sizeof(char));
 }
 
@@ -248,7 +248,7 @@ rnaf_numchars(RNA_FILE *rna_file)
 	}
 
 	/* Open a new FILE pointer to not mess up RNA_FILE's pointer */
-	FILE *fp = fopen(rna_file->filename, "r");
+	gzFile fp = gzopen(rna_file->filename, "r");
 	if(fp == NULL) {
 		error_message("rnaf Failed get numchars: %s", strerror(errno));
 		return 0;
@@ -258,15 +258,11 @@ rnaf_numchars(RNA_FILE *rna_file)
 	char buf[65536];
 	unsigned long total_chars = 0;
 	while(1) {
-		size_t res = fread(buf, 1, 65536, fp);
-		if(ferror(fp)) {
-			error_message("Failed to read file: %s", strerror(errno));
-			return 0;
-		}
+		size_t res = gzfread(buf, sizeof(char), 65536, fp);
 
 		total_chars += res;
 
-		if(feof(fp)) {
+		if(gzeof(fp)) {
 			break;
 		}
 	}
@@ -284,7 +280,7 @@ rnaf_numlines(RNA_FILE *rna_file)
 		return rna_file->num_lines;
 	}
 
-	FILE *fp = fopen(rna_file->filename, "r");
+	gzFile fp = gzopen(rna_file->filename, "r");
 	if(fp == NULL) {
 		error_message("rnaf Failed get numlines: %s", strerror(errno));
 		return 0;
@@ -293,11 +289,7 @@ rnaf_numlines(RNA_FILE *rna_file)
 	char buf[65536];
 	unsigned long counter = 0;
 	while(1) {
-		size_t res = fread(buf, 1, 65536, fp);
-		if(ferror(fp)) {
-			error_message("Failed to read file: %s", strerror(errno));
-			return 0;
-		}
+		size_t res = gzfread(buf, sizeof(char), 65536, fp);
 
 		for(size_t i = 0; i < res; i++) {
 			if(buf[i] == '\n') {
@@ -305,7 +297,7 @@ rnaf_numlines(RNA_FILE *rna_file)
 			}
 		}
 
-		if(feof(fp)) {
+		if(gzeof(fp)) {
 			break;
 		}
 	}
@@ -324,11 +316,11 @@ parse_fasta(RNA_FILE *rna_file, char **ret_seq)
 {   /* Init seq, will be realloc'd based on input stream */
 	char    *seq = NULL;
 
-	while (fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file)) { 
+	while(gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size)) {
 		if (rna_file->buffer[0] == '>') {
 			/* If buffer wasn't large enough to store header, keep reading */
 			while(is_full(rna_file->buffer, rna_file->buffer_size)) {
-				fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file);
+				gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size);
 			}
 			break;  /* New sequence, so break */
 		}
@@ -349,13 +341,13 @@ parse_fastq(RNA_FILE *rna_file, char **ret_seq)
 	unsigned int    reading_seq = 1;
 	unsigned int	current_iter = 0;
 
-	while(fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file)) {
+	while(gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size)) {
 		current_iter+=1;
 
 		if(rna_file->buffer[0] == '@' && current_iter == 4) {
 			/* If buffer wasn't large enough to store header, keep reading */
 			while(is_full(rna_file->buffer, rna_file->buffer_size)) {
-				fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file);
+				gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size);
 			}
 			break;  /* New sequence, so break */
 		}
@@ -382,7 +374,7 @@ parse_reads(RNA_FILE *rna_file, char **ret_seq)
 	char *seq = NULL;
 
 	/* Get next line, and if NULL, return */
-	if(!fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file)) {
+	if(!gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size)) {
 		return;
 	}
 
@@ -392,7 +384,7 @@ parse_reads(RNA_FILE *rna_file, char **ret_seq)
 	/* If buffer was not large enough to store sequence, keep reading */
 	while(is_full(rna_file->buffer, rna_file->buffer_size)) {
 		memset(rna_file->buffer, 0, rna_file->buffer_size*sizeof(char));
-		fgets(rna_file->buffer, rna_file->buffer_size, rna_file->file);
+		gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size);
 		append(&seq, rna_file->buffer);
 	}
 

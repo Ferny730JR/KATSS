@@ -1,7 +1,7 @@
 #ifndef RNA_FILE_PARSER
 #define RNA_FILE_PARSER
 
-#include <stdio.h>
+#include <zlib.h>
 
 #define MAX_SEQ_LENGTH 1000
 
@@ -10,7 +10,7 @@
  *  The struct is used in conjunction with RNA file parsing functions.
  */
 typedef struct RNA_FILE {
-    FILE *file;                     /** File pointer for the RNA file. */
+	gzFile file;                    /** File pointer for the RNA file. */
 	char *filename;                 /** String storing the name of the opened file. */
     char *buffer;                   /** Character buffer to store sequence data. */
 	char *getm_ptr;                 /** Pointer that keeps track of the last position in buffer */
