@@ -6,6 +6,9 @@ project(KATSS
 # Output binaries into build directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
 
+#Include zlib dependency
+find_package(ZLIB REQUIRED)
+
 # Build bppPipeline
 add_executable(bppPipeline
     src/bppPipeline.c
@@ -30,6 +33,7 @@ add_executable(SKA
 
 # Include directories for SKA
 target_include_directories(SKA PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(SKA ZLIB::ZLIB)
 
 # Include directories for BPP
 target_include_directories(bppPipeline PRIVATE src/c_thread_pool)
@@ -55,12 +59,12 @@ else()
     message( SEND_ERROR "System ${CMAKE_SYSTEM_NAME} currently not supported.")
 endif()
 
-# Link bppPipeline with ViennaRNA library
+# Link bppPipeline with libraries
 find_library(LIBRARY_LRNA 
     NAMES RNA
     HINTS "$ENV{HOME}/.local/lib")
 if(LIBRARY_LRNA)
-    target_link_libraries(bppPipeline PUBLIC ${LIBRARY_LRNA})
+    target_link_libraries(bppPipeline PUBLIC ${LIBRARY_LRNA} ZLIB::ZLIB)
 else()
     message( SEND_ERROR "Couldn't find libRNA")
 endif()
