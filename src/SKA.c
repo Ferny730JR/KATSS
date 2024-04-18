@@ -243,6 +243,12 @@ main(int argc, char **argv)
 			free_options(&opt);
 			exit(EXIT_FAILURE);
 		}
+		if(args_info.kmer_arg > 15) {
+			error_message("option '--kmer=%d' must be a value less than or equal to 15.",args_info.kmer_arg);
+			SKA_cmdline_parser_free(&args_info);
+			free_options(&opt);
+			exit(EXIT_FAILURE);
+		}
 		opt.kmer = args_info.kmer_arg;
 	}
 
