@@ -197,8 +197,7 @@ main(int argc, char **argv)
 	if (SKA_cmdline_parser(argc, argv, &args_info) != 0) {
 		exit(EXIT_FAILURE);
 	}
-
-		
+	
 	if(!args_info.input_given && !args_info.bound_given) {
 		printf("Usage: SKA [OPTIONS] [<input.fa>] [<bound.fa>]\n");
 		printf("Try 'SKA --help' for more information.\n");
@@ -410,9 +409,6 @@ count_kmers(char *filename, options *opt)
 		}
 
 		clean_seq(sequence, 0);
-		for(int i=0; i<opt->cur_iter; i++) {
-			cross_out(sequence, opt->top_kmer[i]);
-		}
 
 		kctr_fincrement(counter, sequence);
 		free(sequence);
