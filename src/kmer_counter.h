@@ -7,6 +7,7 @@ typedef struct KmerCounter {
 	unsigned int *entries;      /**< Array to store counts of each k-mer. */
 	unsigned long total_count;
 	unsigned int nucleotide_to_number[256];
+	int is_t;
 } KmerCounter;
 
 
@@ -114,6 +115,6 @@ void kctr_empty(KmerCounter *kmer_counter, char *key);
  * @param index The index of the k-mer.
  * @return The k-mer sequence associated with the specified index.
  */
-char *kctr_get_key(KmerCounter *kmer_counter, unsigned int index);
+void kctr_get_key(KmerCounter *kmer_counter, char *key_ptr, unsigned int index);
 
 #endif // KMER_COUNTER_H

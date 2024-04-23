@@ -22,6 +22,7 @@ init_kcounter(unsigned int k_mer)
 	kctr->capacity = 1 << (2 * k_mer);   // 4^k_mer
 	kctr->entries = s_calloc(kctr->capacity, sizeof(unsigned int));
 	kctr->total_count = 0;
+	kctr->is_t = 1; // assume file is T based by default
 	initialize_mapping(kctr);
 
 	return kctr;
@@ -62,10 +63,10 @@ kctr_hash_key(const char *key)
 }
 
 
-char* 
-kctr_unhash(unsigned int hash_value, int length) 
+void
+kctr_unhash(char *key, unsigned int hash_value, int length, int is_t) 
 {
-	char* key = s_malloc((length + 1) * sizeof(char));
+	// char* key = s_malloc((length + 1) * sizeof(char));
 	key[length] = '\0'; // Null-terminate the string
 
 	for (int i = length - 1; i >= 0; i--) {
@@ -73,12 +74,12 @@ kctr_unhash(unsigned int hash_value, int length)
 			case 0: key[i] = 'A'; break;
 			case 1: key[i] = 'C'; break;
 			case 2: key[i] = 'G'; break;
-			case 3: key[i] = 'T'; break; // Assuming 'T' for the default case
-		}	// todo: make it so case 3 can be either 'U' or 'T' based on specifications
+			case 3: key[i] = is_t ? 'T' : 'U'; break;
+		}
 		hash_value /= 4;
 	}
 
-	return key;
+	// return key;
 }
 
 
@@ -192,11 +193,19 @@ kctr_empty(KmerCounter *kmer_counter, char *key)
 }
 
 
-char *
-kctr_get_key(KmerCounter *kmer_counter, unsigned int index) 
+void
+kctr_get_key(KmerCounter *kmer_counter, char *key_ptr, unsigned int index) 
 {
-	return kctr_unhash(index, kmer_counter->k_mer);
+	kctr_unhash(key_ptr, index, kmer_counter->k_mer, kmer_counter->is_t);
 }
+
+
+void
+kctr_set_t_or_u(KmerCounter *kmer_counter, int is_t)
+{
+	kmer_counter->is_t = is_t;
+}
+
 
 // Function to initialize the nucleotide_to_number array
 static void
