@@ -46,6 +46,8 @@ typedef struct options {
 	unsigned long bound_total;
 
 	kcounts kmer_counts;
+
+	bool encountered_error;
 } options;
 
 
@@ -176,6 +178,8 @@ init_default_options(options *opt)
 
 	opt->kmer_counts.bound_counter = NULL;
 	opt->kmer_counts.input_counter = NULL;
+
+	opt->encountered_error = false;
 }
 
 
@@ -332,6 +336,7 @@ main(int argc, char **argv)
 	} else {
 		while(opt.cur_iter < opt.iterations) {
 			process_iteration(&opt);
+			if(opt.encountered_error) { break; }
 		}
 	}
 
@@ -358,6 +363,12 @@ process_iteration(options *opt)
 		FrqIndependentProbs kmer_data;
 		kmer_data = process_independent_probs(opt->bound_file, opt);
 
+		/* If NULL, error was encountered */
+		if(kmer_data.kmer_frq == NULL) {
+			opt->encountered_error = true;
+			return;
+		}
+
 		input_table = predict_kmers(kmer_data.monomer_frq, kmer_data.dimer_frq, opt->kmer);
 		bound_table = kmer_data.kmer_frq;
 
@@ -368,7 +379,9 @@ process_iteration(options *opt)
 	} else {
 		if(opt->cur_iter == 0) { // first iteration, count kmers
 			opt->kmer_counts.input_counter = count_kmers(opt->input_file, opt);
+			if(opt->kmer_counts.input_counter == NULL) { opt->encountered_error = true; return; }
 			opt->kmer_counts.bound_counter = count_kmers(opt->bound_file, opt);
+			if(opt->kmer_counts.bound_counter == NULL) { opt->encountered_error = true; return; }
 		} else { // second iteration onwards, remove the previously counter kmers
 			uncount_kmers(opt->kmer_counts.input_counter, opt->input_file, opt);
 			uncount_kmers(opt->kmer_counts.bound_counter, opt->bound_file, opt);
@@ -398,6 +411,9 @@ KmerCounter *
 count_kmers(char *filename, options *opt)
 {
 	RNA_FILE *read_file = rnaf_open(filename);
+	if(read_file == NULL) {
+		return NULL;
+	}
 	KmerCounter *counter = init_kcounter(opt->kmer);
 
 	char *sequence;
@@ -450,6 +466,12 @@ process_independent_probs(char *filename, options *opt)
 {
 	FrqIndependentProbs     kmer_data;
 	RNA_FILE *read_file = rnaf_open(filename);
+	if(read_file == NULL) {
+		kmer_data.monomer_frq = NULL;
+		kmer_data.dimer_frq = NULL;
+		kmer_data.kmer_frq = NULL;
+		return kmer_data;
+	}
 
     KmerCounter *monomers_cnt = init_kcounter(1);
     KmerCounter *dimers_cnt = init_kcounter(2);
@@ -463,7 +485,7 @@ process_independent_probs(char *filename, options *opt)
 			break;
 		}
 
-		clean_seq(sequence, 1);
+		clean_seq(sequence, 0);
 		for(int i=0; i<opt->cur_iter; i++) {
 			cross_out(sequence, opt->top_kmer[i]);
 		}
@@ -756,10 +778,10 @@ get_frequencies(KmerCounter *counts)
 			continue;
 		}
 
-		char *key = kctr_get_key(counts, i);
+		char key[16];
+		kctr_get_key(counts, key, i);
 		double k_frequency = (double)kcount/total_kcounts; // calculate frequency
 		kmer_add_value(frq_table, key, k_frequency, 0);
-		free(key);
 	}
 
 	return frq_table;
