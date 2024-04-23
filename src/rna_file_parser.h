@@ -2,6 +2,7 @@
 #define RNA_FILE_PARSER
 
 #include <zlib.h>
+#include <stdbool.h>
 
 #define MAX_SEQ_LENGTH 1000
 
@@ -18,6 +19,7 @@ typedef struct RNA_FILE {
 	unsigned long num_chars;        /** Number to store the total number of chars in file. */
 	unsigned long num_lines;        /** Number to store the total number of lines in file. */
     char filetype;                  /** Character to store which file type was passed. */
+	bool is_u;                      /** Determine if file is T or U based */
 } RNA_FILE;
 
 

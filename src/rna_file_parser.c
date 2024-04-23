@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
@@ -32,6 +33,9 @@ getm_line(char *search, unsigned int found_at);
 
 static char
 determine_filetype(char peek);
+
+static char
+determine_t_or_u(RNA_FILE *rna_file);
 
 static bool
 is_nucleotide(char character);
@@ -80,11 +84,23 @@ rnaf_open(char* filename)
 	/* Determine what type of file was passed */
 	rna_file->filetype = determine_filetype(rna_file->buffer[0]);
 
+	/* Determine the if file uses U or T */
+	char ret_t_or_u = determine_t_or_u(rna_file);
+	if(ret_t_or_u == 0) {
+		gzclose(rna_file->file);
+		free(rna_file->buffer);
+		free(rna_file);
+		error_message("Could not determine if file '%s' uses the nucleotide 'T' or 'U'!",filename);
+		return NULL;
+	}
+	rna_file->is_u = (ret_t_or_u == 'U') ? true : false;
+
 	/* Reset the file to read from beginning */
 	if(rna_file->filetype == 'r') {
 		gzrewind(rna_file->file);
 	}
 
+	/* All pre-processing is done! Return the RNA_FILE pointer */
 	return rna_file;
 }
 
@@ -439,6 +455,78 @@ determine_filetype(char peek)
 	}
 
 	return ret;
+}
+
+
+static bool
+contains_t(char *sequence)
+{
+	while(*sequence) {
+		if(*sequence == 'T' || *sequence == 't') {
+			return true;
+		}
+		sequence++;
+	}
+	return false;
+}
+
+
+static bool
+contains_u(char *sequence)
+{
+	while(*sequence) {
+		if(*sequence == 'U' || *sequence == 'u') {
+			return true;
+		}
+		sequence++;
+	}
+	return false;
+}
+
+
+static char
+determine_t_or_u(RNA_FILE *rna_file)
+{
+	/* Determine T or U from first read*/
+	bool is_t = false; // initialize them in case first seq is null
+	bool is_u = false;
+
+	char *seq;
+	while(1) {
+		seq = rnaf_get(rna_file);
+
+		if(seq == NULL) {
+			return 0;
+		}
+
+		/* Check if sequence contains T or U */
+		is_t = contains_t(seq);
+		is_u = contains_u(seq);
+
+		/* If sequence contained either T or U, break! */
+		if(is_t || is_u) {
+			break;
+		}
+	}
+
+	/* Rewind the file to reset the gets */
+	gzrewind(rna_file->file);
+
+	/* Get the first read for pre processing */
+	gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size);
+
+	if(is_t == is_u) {
+		return 0;
+	}
+	if(is_t) {
+		return 'T';
+	}
+	if(is_u) {
+		return 'U';
+	}
+
+	/* Unreachable code, but used to silence compiler warnings */
+	return 0;
 }
 
 
