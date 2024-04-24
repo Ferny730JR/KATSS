@@ -23,39 +23,46 @@ typedef struct {
 } kcounts;
 
 
+typedef struct IndependentProbCounts {
+	KmerCounter *monomers;
+	KmerCounter *dimers;
+	KmerCounter *kmers;
+} IndependentProbCounts;
+
+
 typedef struct options {
 	char    *input_file;
 	char    *bound_file;
 	char    *out_filename;
 	FILE    *out_file;
 	bool     out_given;
-	int     kmer;
-	int     iterations;
-	char    file_delimiter;
-	bool    no_log;
+	int      kmer;
+	int      iterations;
+	char     file_delimiter;
+	bool     no_log;
 
-	bool    independent_probs;
-	char    **fmotif;
+	bool     independent_probs;
+	char   **fmotif;
 	char    *motif;
-	int     num_motifs;
+	int      num_motifs;
 
-	char    **top_kmer;
+	char  **top_kmer;
 	int     cur_iter;
 
 	unsigned long input_total;
 	unsigned long bound_total;
 
-	kcounts kmer_counts;
+	IndependentProbCounts *counts;
+	kcounts                kmer_counts;
 
 	bool encountered_error;
 } options;
 
 
-typedef struct {
-	kmerHashTable *monomer_frq;
-	kmerHashTable *dimer_frq;
-	kmerHashTable *kmer_frq;
-} FrqIndependentProbs;
+typedef struct TopKmer {
+	char k_mer[16]; /* 16 because max 15mer + string terminator */
+	double enrichment;
+} TopKmer;
 
 
 /*##########################################################
@@ -72,11 +79,17 @@ count_kmers(char *filename, options *opt);
 void
 uncount_kmers(KmerCounter *counter, char *filename, options *opt);
 
-FrqIndependentProbs
-process_independent_probs(char *filename, options *opt);
+TopKmer
+get_top_kmer(KmerCounter *input_counter, KmerCounter *bound_counter);
 
-kmerHashTable *
-predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer);
+IndependentProbCounts *
+count_dimonomers(char *filename, options *opt);
+
+void
+uncount_dimonomers(char *filename, options *opt);
+
+TopKmer
+get_top_prediction(IndependentProbCounts *counts);
 
 kmerHashTable *
 get_frequencies(KmerCounter *counts);
@@ -134,7 +147,7 @@ char
 delimiter_to_char(char *user_delimiter);
 
 void
-entry_to_file(FILE *file, Entry *entry, char delimiter);
+topkmer_to_file(TopKmer top_kmer, options *opt);
 
 void
 cluster_to_file(FILE *file, RegexCluster *cluster, char delimiter);
@@ -178,6 +191,7 @@ init_default_options(options *opt)
 
 	opt->kmer_counts.bound_counter = NULL;
 	opt->kmer_counts.input_counter = NULL;
+	opt->counts = NULL;
 
 	opt->encountered_error = false;
 }
@@ -354,28 +368,19 @@ main(int argc, char **argv)
 void 
 process_iteration(options *opt)
 {
-	kmerHashTable *input_table;
-	kmerHashTable *bound_table;
-	kmerHashTable *enrichments_table;
+	TopKmer top_kmer;
 
 	/* Compute independent SKA analysis (no control) */
 	if(opt->independent_probs) {
-		FrqIndependentProbs kmer_data;
-		kmer_data = process_independent_probs(opt->bound_file, opt);
-
-		/* If NULL, error was encountered */
-		if(kmer_data.kmer_frq == NULL) {
-			opt->encountered_error = true;
-			return;
+		if(opt->cur_iter == 0) {
+			IndependentProbCounts *counts = count_dimonomers(opt->bound_file, opt);
+			opt->counts = counts;
+		} else {
+			uncount_dimonomers(opt->bound_file, opt);
 		}
+		top_kmer = get_top_prediction(opt->counts);
 
-		input_table = predict_kmers(kmer_data.monomer_frq, kmer_data.dimer_frq, opt->kmer);
-		bound_table = kmer_data.kmer_frq;
-
-		free_kmer_table(kmer_data.monomer_frq);
-		free_kmer_table(kmer_data.dimer_frq);
-
-	/* Compute normal SKA analysis */
+	/* Compute Iterative K-mer Knockout Analysis IKKA */
 	} else {
 		if(opt->cur_iter == 0) { // first iteration, count kmers
 			opt->kmer_counts.input_counter = count_kmers(opt->input_file, opt);
@@ -386,24 +391,17 @@ process_iteration(options *opt)
 			uncount_kmers(opt->kmer_counts.input_counter, opt->input_file, opt);
 			uncount_kmers(opt->kmer_counts.bound_counter, opt->bound_file, opt);
 		}
-		input_table = get_frequencies(opt->kmer_counts.input_counter);
-		bound_table = get_frequencies(opt->kmer_counts.bound_counter);
+
+		/* After getting counts, we can get the top k-mer */
+		top_kmer = get_top_kmer(opt->kmer_counts.input_counter,opt->kmer_counts.bound_counter);
 	}
 
-	/* Function to compute enrichments for all k-mers */
-	enrichments_table = get_enrichment(input_table, bound_table, opt);
-
 	/* Dump information into output file */
-	Entry *max_entry = kmer_max_entry(enrichments_table);
-	entry_to_file(opt->out_file, max_entry, opt->file_delimiter);
+	topkmer_to_file(top_kmer, opt);
 
-	opt->top_kmer[opt->cur_iter] = strdup(max_entry->key);
+	/* Store information for next iteration */
+	opt->top_kmer[opt->cur_iter] = strdup(top_kmer.k_mer);
 	opt->cur_iter++;
-
-	/* free tables */
-	free_kmer_table(enrichments_table);
-	free_kmer_table(input_table);
-	free_kmer_table(bound_table);
 }
 
 
@@ -415,6 +413,7 @@ count_kmers(char *filename, options *opt)
 		return NULL;
 	}
 	KmerCounter *counter = init_kcounter(opt->kmer);
+	kctr_set_t_or_u(counter, read_file->is_t);
 
 	char *sequence;
 	while(true) {
@@ -461,100 +460,187 @@ uncount_kmers(KmerCounter *counter, char *filename, options *opt)
 }
 
 
-FrqIndependentProbs
-process_independent_probs(char *filename, options *opt)
+TopKmer
+get_top_kmer(KmerCounter *input_counter, KmerCounter *bound_counter)
 {
-	FrqIndependentProbs     kmer_data;
-	RNA_FILE *read_file = rnaf_open(filename);
-	if(read_file == NULL) {
-		kmer_data.monomer_frq = NULL;
-		kmer_data.dimer_frq = NULL;
-		kmer_data.kmer_frq = NULL;
-		return kmer_data;
+	TopKmer top_kmer = {.enrichment = -DBL_MAX};
+	unsigned int top_enrichment_hash;
+	double top_enrichment = -DBL_MAX;
+
+	/* Sanity check, make sure total_count is greater than 0 */
+	if(!input_counter->total_count || !bound_counter->total_count) {
+		return top_kmer;
+	}
+	
+	for(unsigned int i=0; i<input_counter->capacity; i++) {
+		/* Get frequencies of input and bound */
+		double input_frq = (double)input_counter->entries[i]/input_counter->total_count;
+		double bound_frq = (double)bound_counter->entries[i]/bound_counter->total_count;
+
+		/* if input_frq is 0, then div by 0 error would occur so skip */
+		if(input_frq == 0) {
+			continue;
+		}
+
+		/* get enrichment of current kmer */
+		double cur_enrichment = log2(bound_frq/input_frq);
+
+		if(cur_enrichment > top_enrichment) {
+			top_enrichment = cur_enrichment;
+			top_enrichment_hash = i;
+		}
 	}
 
-    KmerCounter *monomers_cnt = init_kcounter(1);
-    KmerCounter *dimers_cnt = init_kcounter(2);
-    KmerCounter *counts_cnt = init_kcounter(opt->kmer);
+	/* No top kmer was found (probs because something terrible happened) return empty struct */
+	if(top_enrichment == top_kmer.enrichment) {
+		return top_kmer;
+	}
 
-	/* Count di/monomers & k-mers */
-	char *sequence = NULL;
-	while(1) {
+	/* Get k-mer string from hash */
+	kctr_get_key(input_counter, top_kmer.k_mer, top_enrichment_hash);
+
+	/* Fill struct with info */
+	top_kmer.enrichment = top_enrichment;
+
+	/* Everything (probably) worked! Hurray, now return. */
+	return top_kmer;
+}
+
+
+IndependentProbCounts *
+count_dimonomers(char *filename, options *opt)
+{
+	RNA_FILE *read_file = rnaf_open(filename);
+	if(read_file == NULL) {
+		return NULL;
+	}
+
+	IndependentProbCounts *counts = s_malloc(sizeof(IndependentProbCounts));
+	counts->monomers = init_kcounter(1U);     kctr_set_t_or_u(counts->monomers, read_file->is_t);
+	counts->dimers   = init_kcounter(2U);     kctr_set_t_or_u(counts->dimers, read_file->is_t);
+	counts->kmers = init_kcounter(opt->kmer); kctr_set_t_or_u(counts->kmers, read_file->is_t);
+
+	char *sequence;
+	while(true) {
 		sequence = rnaf_get(read_file);
+
 		if(sequence == NULL) {
 			break;
 		}
 
 		clean_seq(sequence, 0);
-		for(int i=0; i<opt->cur_iter; i++) {
-			cross_out(sequence, opt->top_kmer[i]);
-		}
-
-		kctr_increment(monomers_cnt, sequence);
-		kctr_increment(dimers_cnt, sequence);
-		kctr_increment(counts_cnt, sequence);
+		kctr_fincrement(counts->monomers, sequence);
+		kctr_fincrement(counts->dimers, sequence);
+		kctr_fincrement(counts->kmers, sequence);
 
 		free(sequence);
 	}
 	rnaf_close(read_file);
 
-	/* Get frequencies of the counts */
-	kmer_data.monomer_frq = get_frequencies(monomers_cnt);
-	kmer_data.dimer_frq = get_frequencies(dimers_cnt);
-	kmer_data.kmer_frq = get_frequencies(counts_cnt);
-
-	/* Clean up data */
-	free_kcounter(monomers_cnt);
-	free_kcounter(dimers_cnt);
-	free_kcounter(counts_cnt);
-
-    return kmer_data;
+	return counts;
 }
 
 
-kmerHashTable *
-predict_kmers(kmerHashTable *probs_1mer, kmerHashTable *probs_2mer, int kmer)
+void
+uncount_dimonomers(char *filename, options *opt)
 {
-    kmerHashTable   *predicted_kmers;
-    double          dinucleotides_prob;
-    double          monomers_probs;
-    double          *prob;
-	char			*k_str;
-    char            *k_substr;
+	RNA_FILE *read_file = rnaf_open(filename);
+	if(read_file == NULL) {
+		opt->encountered_error = true;
+		return;
+	}
 
-    predicted_kmers = init_kmer_table(kmer,1);
-	
-	k_str = s_malloc((kmer + 1) * sizeof(char));
-	k_str[kmer] = '\0';
+	char *top_kmer = opt->top_kmer[opt->cur_iter-1];
+	rnaf_rebuff(read_file, 65536U);
 
-    /* Get the probability of kmer being in reads */
-    for(unsigned long i = 0; i < predicted_kmers->capacity; i++) {
-		int index = i;	/* Create next k-mer */
-		for(int j = kmer-1; j >= 0; j--) {
-			k_str[j] = BASES[index % 4];
-			index /= 4;
+	char *sequence;
+	while(true) {
+		sequence = rnaf_getm(read_file, top_kmer);
+
+		if(sequence == NULL) {
+			break;
 		}
 
-		/* Calculate probability of created k-mer string */
-        dinucleotides_prob = 1;
-        monomers_probs     = 1;
-        for(int j=0; j < kmer-1; j++) {
-            k_substr = substr(k_str, j, 2);
-            prob = kmer_get(probs_2mer, k_substr);
-            free(k_substr);
-            dinucleotides_prob*=prob[0];
-        }
-        for(int j=1; j < kmer-1; j++) {
-            k_substr = substr(k_str, j, 1);
-            prob = kmer_get(probs_1mer, k_substr);
-            free(k_substr);
-            monomers_probs*=prob[0];
-        }
-        kmer_add_value(predicted_kmers, k_str, dinucleotides_prob/monomers_probs, 0);
-    }
-	free(k_str);
+		clean_seq(sequence, 0);
+		for(int i=0; i<opt->cur_iter-1; i++) {
+			cross_out(sequence, opt->top_kmer[i]);
+		}
 
-    return predicted_kmers;
+		kctr_decrement(opt->counts->kmers, sequence, top_kmer);
+	}
+	rnaf_close(read_file);
+}
+
+
+double
+predict_kmer(char *kseq, KmerCounter *monomer_counts, KmerCounter *dimer_counts)
+{
+	char monoseq[2];  monoseq[1] = '\0';
+	char diseq[3];    diseq[2]   = '\0';
+
+	double monoprob = 1;
+	double diprob = 1;
+
+	int kmer = strlen(kseq);
+
+	/* Get the cumulative probabilities for overlapping monomers */
+	for(int i=1; i<kmer-1; i++) {
+		monoseq[0] = kseq[i];
+		double count = (double)kctr_get(monomer_counts, monoseq);
+		monoprob *= count/monomer_counts->total_count;
+	}
+
+	/* Get probabilities for all di-mers in k-mer */
+	for(int i=0; i<kmer-1; i++) {
+		diseq[0] = kseq[i]; diseq[1] = kseq[i+1];
+		double count = (double)kctr_get(dimer_counts, diseq);
+		diprob *= count/dimer_counts->total_count;
+	}
+
+	/* Predicted k-mer probability is dinucleotides / overlapping monomers */
+	return diprob/monoprob;
+}
+
+
+TopKmer
+get_top_prediction(IndependentProbCounts *counts)
+{
+	TopKmer top_kmer = {.enrichment = -DBL_MAX};
+	double top_enrichment = -DBL_MAX;
+	char kseq[16];
+
+	for(unsigned int i=0; i<counts->kmers->capacity; i++) {
+		kctr_get_key(counts->kmers, kseq, i);
+
+		/* Get actual and predicted frequencies */
+		double kmer_frq = (double)counts->kmers->entries[i]/counts->kmers->total_count;
+		double predicted_frq = predict_kmer(top_kmer.k_mer, counts->monomers, counts->dimers);
+
+		/* if input_frq is 0, then div by 0 error would occur so skip */
+		if(predicted_frq == 0) {
+			continue;
+		}
+
+		/* get enrichment of current kmer */
+		double cur_enrichment = log2(kmer_frq/predicted_frq);
+		// printf("%s: log2(%f/%f) = %f\n",top_kmer.k_mer, kmer_frq,predicted_frq,cur_enrichment);
+
+		if(cur_enrichment > top_enrichment) {
+			top_enrichment = cur_enrichment;
+			kctr_get_key(counts->kmers, top_kmer.k_mer, i);
+		}
+	}
+
+	/* No top kmer was found (probs because something terrible happened) return empty struct */
+	if(top_enrichment == top_kmer.enrichment) {
+		return top_kmer;
+	}
+
+	/* Fill struct with info */
+	top_kmer.enrichment = top_enrichment;
+
+	/* Everything (probably) worked! Hurray, now return. */
+	return top_kmer;
 }
 
 
@@ -972,9 +1058,12 @@ delimiter_to_char(char *user_delimiter)
 
 
 void 
-entry_to_file(FILE *file, Entry *entry, char delimiter)
+topkmer_to_file(TopKmer top_kmer, options *opt)
 {
-    fprintf(file, "%s%c%f\n", entry->key, delimiter, entry->values[0]);
+	char *kseq = strdup(top_kmer.k_mer);
+	clean_seq(kseq, true);
+	fprintf(opt->out_file, "%s%c%f\n", kseq, opt->file_delimiter, top_kmer.enrichment);
+	free(kseq);
 }
 
 
