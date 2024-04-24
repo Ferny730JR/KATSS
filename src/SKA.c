@@ -872,7 +872,7 @@ get_cluster_enrichment(RegexCluster *input_cluster, RegexCluster *bound_cluster,
 	for(uint8_t cur_bin = 0; cur_bin < enrichment_cluster->num_bins; cur_bin++) {
 		get_bin_enrichment(&enrichment_cluster->bin[cur_bin],
 		                   input_cluster->bin[cur_bin],
-						   bound_cluster->bin[cur_bin]);
+		                   bound_cluster->bin[cur_bin]);
 	}
 
 	return enrichment_cluster;
@@ -910,35 +910,35 @@ get_pos_enrichments(BinsLenInfo *enr_len, BinsLenInfo in_len, BinsLenInfo bo_len
 char 
 delimiter_to_char(char *user_delimiter)
 {
-    char delimiter;
-    char provided_val = user_delimiter[0];
-    if(strlen(user_delimiter)>1) {
-        provided_val = 0;
-    }
+	char delimiter;
+	char provided_val = user_delimiter[0];
+	if(strlen(user_delimiter)>1) {
+		provided_val = 0;
+	}
 
-    switch(provided_val) {
-        case ',':
-            delimiter = ',';
-            break;
-        case 't':
-            delimiter = '\t';
-            break;
-        case ':':
-            delimiter = ':';
-            break;
-        case '|':
-            delimiter = '|';
-            break;
-        case ' ':
-            delimiter = ' ';
-            break;
-        default:
-            warning_message("Provided delimiter '%s' is not valid. Defaulting to ','",
-            user_delimiter);
-            delimiter = ',';
-    }
+	switch(provided_val) {
+		case ',':
+			delimiter = ',';
+			break;
+		case 't':
+			delimiter = '\t';
+			break;
+		case ':':
+			delimiter = ':';
+			break;
+		case '|':
+			delimiter = '|';
+			break;
+		case ' ':
+			delimiter = ' ';
+			break;
+		default:
+			warning_message("Provided delimiter '%s' is not valid. Defaulting to ','",
+			user_delimiter);
+			delimiter = ',';
+	}
 
-    return delimiter;
+	return delimiter;
 }
 
 
@@ -980,7 +980,6 @@ cluster_to_file(FILE *file, RegexCluster *cluster, char delimiter)
 			clusterlen_to_file(cluster->bin[cur_bin].len[cur_len], cur_bin, lenlen, max_len, file, delimiter);
 		}
 	}
-
 }
 
 
@@ -1000,27 +999,26 @@ clusterlen_to_file(BinsLenInfo len, uint8_t bin, uint16_t lenlen, uint16_t
 		}
 	}
 	fprintf(file, "\n");
-
 }
 
 
 void 
 free_options(options *opt)
 {
-    if(opt->input_file && !opt->independent_probs) {
-        free(opt->input_file);
-    }
-    if(opt->bound_file) {
-        free(opt->bound_file);
-    }
-    if(opt->out_given) {
-        free(opt->out_filename);
-    }
-    for(int i=0; i<opt->iterations; i++) {
+	if(opt->input_file && !opt->independent_probs) {
+		free(opt->input_file);
+	}
+	if(opt->bound_file) {
+		free(opt->bound_file);
+	}
+	if(opt->out_given) {
+		free(opt->out_filename);
+	}
+	for(int i=0; i<opt->iterations; i++) {
 		if(opt->top_kmer) {
-        	free(opt->top_kmer[i]);
+			free(opt->top_kmer[i]);
 		}
-    }
+	}
 	if(opt->motif) {
 		free(opt->motif);
 	}
@@ -1031,10 +1029,10 @@ free_options(options *opt)
 		free(opt->fmotif);
 	}
 	if(opt->top_kmer) {
-    	free(opt->top_kmer);
+		free(opt->top_kmer);
 	}
 	if(opt->out_file) {
-    	fclose(opt->out_file);
+		fclose(opt->out_file);
 	}
 }
 
@@ -1042,12 +1040,12 @@ free_options(options *opt)
 void
 print_options(options *opt)
 {
-    printf("input_file: '%s'\n",opt->input_file);
-    printf("bound_file: '%s'\n",opt->bound_file);
-    printf("output_file: '%s'\n",opt->out_filename);
-    printf("kmer: '%d'\n",opt->kmer);
-    printf("iterations: '%d'\n",opt->iterations);
-    printf("probs: '%d'\n",opt->independent_probs);
+	printf("input_file: '%s'\n",opt->input_file);
+	printf("bound_file: '%s'\n",opt->bound_file);
+	printf("output_file: '%s'\n",opt->out_filename);
+	printf("kmer: '%d'\n",opt->kmer);
+	printf("iterations: '%d'\n",opt->iterations);
+	printf("probs: '%d'\n",opt->independent_probs);
 }
 
 

@@ -211,22 +211,22 @@ kctr_set_t_or_u(KmerCounter *kmer_counter, int is_t)
 static void
 initialize_mapping(KmerCounter *kcounter)
 {
-    // Initialize all elements to 0
-    for (int i = 0; i < 256; i++) {
-        kcounter->nucleotide_to_number[i] = (unsigned int)0;
-    }
-    
-    // Assign values for nucleotides
-    kcounter->nucleotide_to_number['A'] = (unsigned int)0;
-    kcounter->nucleotide_to_number['C'] = (unsigned int)1;
-    kcounter->nucleotide_to_number['G'] = (unsigned int)2;
-    kcounter->nucleotide_to_number['T'] = (unsigned int)3;
+	// Initialize all elements to 0
+	for (int i = 0; i < 256; i++) {
+		kcounter->nucleotide_to_number[i] = (unsigned int)0;
+	}
+
+	// Assign values for nucleotides
+	kcounter->nucleotide_to_number['A'] = (unsigned int)0;
+	kcounter->nucleotide_to_number['C'] = (unsigned int)1;
+	kcounter->nucleotide_to_number['G'] = (unsigned int)2;
+	kcounter->nucleotide_to_number['T'] = (unsigned int)3;
 	kcounter->nucleotide_to_number['U'] = (unsigned int)3;
-    
-    // Handling for lowercase nucleotides
-    kcounter->nucleotide_to_number['a'] = (unsigned int)0;
-    kcounter->nucleotide_to_number['c'] = (unsigned int)1;
-    kcounter->nucleotide_to_number['g'] = (unsigned int)2;
-    kcounter->nucleotide_to_number['t'] = (unsigned int)3;
+
+	// Handling for lowercase nucleotides
+	kcounter->nucleotide_to_number['a'] = (unsigned int)0;
+	kcounter->nucleotide_to_number['c'] = (unsigned int)1;
+	kcounter->nucleotide_to_number['g'] = (unsigned int)2;
+	kcounter->nucleotide_to_number['t'] = (unsigned int)3;
 	kcounter->nucleotide_to_number['u'] = (unsigned int)3;
 }
