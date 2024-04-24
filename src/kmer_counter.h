@@ -117,4 +117,15 @@ void kctr_empty(KmerCounter *kmer_counter, char *key);
  */
 void kctr_get_key(KmerCounter *kmer_counter, char *key_ptr, unsigned int index);
 
+
+/**
+ * @brief Set whether kctr_get_key() should use 'T' or 'U'.
+ * 
+ * Set `is_t` to 1 (true) if it should use 'T', or 0 (false) if it should use 'U'.
+ * 
+ * @param kmer_counter 
+ * @param is_t          Used to determine if kmer_counter should use 'T' or 'U'.
+ */
+void kctr_set_t_or_u(KmerCounter *kmer_counter, int is_t);
+
 #endif // KMER_COUNTER_H
