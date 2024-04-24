@@ -93,7 +93,7 @@ rnaf_open(char* filename)
 		error_message("Could not determine if file '%s' uses the nucleotide 'T' or 'U'!",filename);
 		return NULL;
 	}
-	rna_file->is_u = (ret_t_or_u == 'U') ? true : false;
+	rna_file->is_t = (ret_t_or_u == 'T') ? true : false;
 
 	/* Reset the file to read from beginning */
 	if(rna_file->filetype == 'r') {
