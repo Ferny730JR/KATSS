@@ -9,7 +9,6 @@
 
 #include "rna_file_parser.h"
 #include "kmer_counter.h"
-#include "kmerHashTable.h"
 #include "Regex.h"
 #include "string_utils.h"
 #include "utils.h"
@@ -91,12 +90,6 @@ uncount_dimonomers(char *filename, options *opt);
 TopKmer
 get_top_prediction(IndependentProbCounts *counts);
 
-kmerHashTable *
-get_frequencies(KmerCounter *counts);
-
-kmerHashTable *
-get_enrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt);
-
 /* fmotif functions */
 void
 process_fmotifs(options *opt);
@@ -140,9 +133,6 @@ get_pos_enrichments(BinsLenInfo *enr_len, BinsLenInfo in_len,
                     BinsLenInfo bo_len, uint16_t num_pos);
 
 /* Helper functions */
-Entry *
-kmer_max_entry(kmerHashTable *hash_table);
-
 char
 delimiter_to_char(char *user_delimiter);
 
@@ -821,91 +811,6 @@ process_motif_match(RegexCluster *cluster, Matcher matcher, char *search)
 		}
 		clusterIndex++;
 	}
-
-	/*
-	To process the matched motif, we use the clustering algorithm we made.
-	In each cluster, we find the preference for cluster length, and the preference for
-	positional nucleotides.
-
-	This is going to work by getting the length of the cluster bin, and adding it to the count
-	of how many times that length was encountered. 
-	
-	TODO: Add option --norepeat (--nomut? --mutlexcl?)
-	This is to make sure when you pass multiple regex patterns, that those patterns can not match
-	the same sequences in the file. This is going to work by storing a set or ranges, e.g:
-	struct range_set {
-		struct range_pair[a lot of possible ranges]
-	} range_set;
-	struct range_pair {
-		unsigned int min;
-		unsigned int max;
-	}
-	Though this could be subject to change for more efficient checking. We loop through the range pairs,
-	and see if the match falls within an existing range. If it does, then we ignore it. Otherwise, we process them as usual and then add them to the ranges.
-
-	SIDENOTE: Possible fast searching,
-	Instead of using range_set, we create a red-black binary tree that stores the range_pairs.
-	We then check if min and max of current match fall within the top node, and if not, keep
-	traversing the tree until you reach null (will be log2)
-	
-	*/
-}
-
-
-kmerHashTable *
-get_frequencies(KmerCounter *counts)
-{
-	kmerHashTable *frq_table = init_kmer_table(counts->k_mer, 1);
-	unsigned long total_kcounts = counts->total_count;
-
-	unsigned int kcount;
-	for(unsigned int i=0; i<counts->capacity; i++) {
-		if(!(kcount=counts->entries[i])) {
-			continue;
-		}
-
-		char key[16];
-		kctr_get_key(counts, key, i);
-		double k_frequency = (double)kcount/total_kcounts; // calculate frequency
-		kmer_add_value(frq_table, key, k_frequency, 0);
-	}
-
-	return frq_table;
-}
-
-
-kmerHashTable *
-get_enrichment(kmerHashTable *input_frq, kmerHashTable *bound_frq, options *opt)
-{
-    char            *key;
-    double          *input_values;
-    double          *bound_values;
-    double          enrichment;
-
-    kmerHashTable *enrichments_table = init_kmer_table(opt->kmer, 1);
-    
-    // Get the log2 fold change for each kmer
-    for(unsigned long i = 0; i < enrichments_table->capacity; i++) {
-        if(bound_frq->entries[i] == NULL || input_frq->entries[i] == NULL) {
-            continue;
-        }
-
-        key = bound_frq->entries[i]->key;
-
-        bound_values = kmer_get(bound_frq, key);
-        input_values = kmer_get(input_frq, key);
-
-        if(bound_values[0] == 0.0 || input_values[0] == 0.0) {
-            enrichment = 0.0;
-		} else if(opt->no_log) {
-			enrichment = bound_values[0]/input_values[0];
-        } else {
-            enrichment = log2(bound_values[0]/input_values[0]);
-        }
-        kmer_add_value(enrichments_table, key, enrichment, 0);
-    }
-
-    return enrichments_table;
 }
 
 
@@ -1001,26 +906,6 @@ get_pos_enrichments(BinsLenInfo *enr_len, BinsLenInfo in_len, BinsLenInfo bo_len
 /*##########################################################
 #  Helper Functions                                        #
 ##########################################################*/
-
-Entry *
-kmer_max_entry(kmerHashTable *hash_table)
-{
-    double max_value = -DBL_MAX;
-    Entry *max_entry = NULL;
-    for(unsigned long i=0; i<hash_table->capacity; i++) {
-        if(hash_table->entries[i] == NULL) {
-            continue;
-        }
-        
-        if(hash_table->entries[i]->values[0] > max_value) {
-            max_value = hash_table->entries[i]->values[0];
-            max_entry = hash_table->entries[i];
-        }
-    }
-
-    return max_entry;
-}
-
 
 char 
 delimiter_to_char(char *user_delimiter)
