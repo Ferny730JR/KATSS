@@ -114,10 +114,10 @@ kctr_fincrement(KmerCounter *kcounter, const char *sequence)
 	for (int i = k; i < sequence_length; i++) {
 		unsigned int x = kcounter->nucleotide_to_number[(unsigned char)sequence[i]];
 		hash_value = ((hash_value << 2) | x) & word_mask;
-        
+
 		kcounter->entries[hash_value]++;
 		kcounter->total_count++;
-    }
+	}
 }
 
 
