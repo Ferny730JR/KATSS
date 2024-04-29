@@ -11,8 +11,8 @@ find_package(ZLIB REQUIRED)
 
 # Build bppPipeline
 add_executable(bppPipeline
-    src/bppPipeline.c
-    src/bppPipeline_cmdl.c
+    src/bin/bppPipeline.c
+    src/bin/bppPipeline_cmdl.c
     src/rna_file_parser.c
     src/kmerHashTable.c
     src/string_utils.c
@@ -22,22 +22,22 @@ add_executable(bppPipeline
 
 # Build SKA
 add_executable(SKA
-    src/SKA.c
+    src/bin/SKA.c
+	src/bin/SKA_cmdl.c
     src/rna_file_parser.c
 	src/kmer_counter.c
     src/kmerHashTable.c
     src/string_utils.c
     src/utils.c
-	src/Regex.c
-    src/SKA_cmdl.c)
+	src/Regex.c)
 
 # Include directories for SKA
-target_include_directories(SKA PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(SKA PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(SKA ZLIB::ZLIB)
 
 # Include directories for BPP
 target_include_directories(bppPipeline PRIVATE src/c_thread_pool)
-target_include_directories(bppPipeline PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(bppPipeline PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
 find_path(VIENNARNA_INCLUDE_DIRS 
     NAMES ViennaRNA/fold.h
     PATHS $ENV{HOME}/.local/include /usr/local/include)
