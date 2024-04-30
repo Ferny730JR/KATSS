@@ -84,6 +84,11 @@ rnaf_open(char* filename)
 	/* Determine what type of file was passed */
 	rna_file->filetype = determine_filetype(rna_file->buffer[0]);
 
+	/* Reset the file to read from beginning */
+	if(rna_file->filetype == 'r') {
+		gzrewind(rna_file->file);
+	}
+
 	/* Determine the if file uses U or T */
 	char ret_t_or_u = determine_t_or_u(rna_file);
 	if(ret_t_or_u == 0) {
@@ -94,11 +99,6 @@ rnaf_open(char* filename)
 		return NULL;
 	}
 	rna_file->is_t = (ret_t_or_u == 'T') ? true : false;
-
-	/* Reset the file to read from beginning */
-	if(rna_file->filetype == 'r') {
-		gzrewind(rna_file->file);
-	}
 
 	/* All pre-processing is done! Return the RNA_FILE pointer */
 	return rna_file;
@@ -513,7 +513,9 @@ determine_t_or_u(RNA_FILE *rna_file)
 	gzrewind(rna_file->file);
 
 	/* Get the first read for pre processing */
-	gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size);
+	if(rna_file->filetype != 'r') {
+		gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size);
+	}
 
 	if(is_t == is_u) {
 		return 0;
