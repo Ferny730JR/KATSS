@@ -1,0 +1,76 @@
+package "ASPIIRE - Active Searching of Protein-Interactive Iron-Responsive Elements"
+
+purpose "IRE discovery tool"
+
+usage "ASPIIRE [OPTIONS] [<feature_annotations.txt>]"
+
+version "1.0"
+
+args "--file-name=aspiire_cmdl --include-getopt --default-optional --unamed-opts --func-name=aspiire_cmdline_parser --arg-struct-name=aspiire_args_info"
+
+description "ASPIIRE is a C program designed to detect and potential IREs in a sequence.\n\
+The program follows a structured pipeline that includes k-mer counting, frequency calculations,\
+ and enrichment analysis, producing a CSV file with ranked k-mers based on their likelihood of\
+ being a motif."
+
+
+section "I/O Options"
+sectiondesc="Command line options for input and output processing.\n\n"
+
+option "input" i
+"Read the controls sequences file.\n"
+details="SKA by default reads the positional arguments that follow the SKA\
+ command, or reading from stdin. By using this option, you can specify which file you want to be\
+ the control sequences. Note that you can only pass one control file in the command.\n"
+string
+typestr="filename"
+optional
+
+option "output" o
+"Set the name of the output files.\n"
+details="Specify the default name for the output file. If this option is not used, the default name is \"motif.dsv\".\n"
+string
+typestr="filename"
+optional
+
+option "kmer" k
+"Set the length of k-mers.\n"
+details="Specify the length of the k-mers you want to search IREs for.\n"
+int
+default="30"
+optional
+
+option "threshold" t
+"Specify the minimum percent match that predicted structure should match RNAfold structure.\n"
+details="The program uses the ViennaRNA package to get the predicted structure of a matched RNA.\
+ This predicted structure is then compared with the predicted IRE structure of the matched\
+ sequence, to determine the accuracy of the IRE structure.\n"
+int
+default="78"
+optional
+
+option "format" -
+"Specify the format of the input file.\n"
+details="format options:\n\t`seq',`transcript_id', `gene_id', `gene_name', `strand', `chr', `range'\n\n\tSet format to the variables in your file, in the order they are listed as\n\ta comma separated list\n\tFor example, assuming you had a file as such\n\n\t  $ cat UTR.txt\n\t  >UTR.txt\n\t  ENST00000001146 ENSG00000003137 - 2 72147835-72147852 ACAGCCAATCCCCCGAG\n\n\tThen you would set the format option to:\n\t--format=\"transcript_id,gene_id,strand,chr,range,seq\"\n\n\tIf you instead had the following file:\n\n\t  $ cat UTR.fa\n\t  >UTR.fa\n\t  ACAGCCAATCCCCCGAG\n\n\tThen you would set the format option as such: --format=\"seq\"\n"
+string
+default="seq"
+optional
+
+option "file-delimiter" d
+"Set the delimiter used to separate the values in the output file.\n"
+details="The output of aspiire by default is in csv format, meaning the values are comma\
+ delimited. By specifying this option, you can change the delimiter used to separate the values.\
+ The available delimiters are: comma (,), tab ('t'), colon (:), vertical bar (|), and space\
+ (\" \")\n\
+For example, setting the file delimiter option to:\n\
+ \t--file-delimiter=\" \"\n\
+will change the delimiter to be space separated. Support for other delimiters is currently unavailable.\n"
+string
+typestr="char"
+default=","
+optional
+
+option "no-rnafold" -
+"Don't compare IRE folds with RNAfold. Only use this if you are encountering performance issues.\n"
+flag
+off
