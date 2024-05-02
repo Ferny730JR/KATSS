@@ -86,6 +86,19 @@ void append(char **s1, const char *s2);
 
 
 /**
+ * @brief Prepends the contents of `s2` into `s1`.
+ * 
+ *  The function allocates memory for the combined result and updates the first string accordingly.
+ *  If the first string is null or empty, it essentially duplicates the contents of `s2` into `s1`.
+ *  Similarly, if `s2` is null or empty, then the contents of `s1` will remain the same.
+ * 
+ * @param s1 The pointer to the first string (modifiable)
+ * @param s2 The second string to prepend
+ */
+void prepend(char **s1, const char *s2);
+
+
+/**
  *  @brief Finds the starting index of the first occurrence of a substring in a given string.
  *
  *  This function searches for the first occurrence of the substring specified by `s2` within

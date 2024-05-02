@@ -94,6 +94,20 @@ void append(char **s1, const char *s2) {
 }
 
 
+void prepend(char **s1, const char *s2) {
+	const size_t len1 = *s1 ? strlen(*s1) : 0;
+    const size_t len2 =  s2 ? strlen(s2)  : 0;
+
+	if(len2 == 0) {
+		return;    // s2 is NULL or empty, so dont modify contents of s1
+	}
+
+	*s1 = s_realloc(*s1,len1 + len2 + 1);
+	memmove(*s1 + len2, *s1, len1 + 1);
+	memcpy(*s1, s2, len2);
+}
+
+
 int subindx(const char *s1, const char *s2) {
     char *s = strstr(s1, s2);
     if(s) {
