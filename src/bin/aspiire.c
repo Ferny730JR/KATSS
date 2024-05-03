@@ -14,7 +14,15 @@
 #define BUFFER_SIZE 16777216
 
 
-typedef struct IRE_STRUCTURE {
+typedef struct IreInfo {
+	char *sequence;
+	char *structure;
+	char *gene_id;
+	char *transcript_id;
+	char *chromosome;
+} IreInfo;
+
+typedef struct IreStructure {
 	char *sequence;
 	char *structure;
 	bool is_valid;
@@ -27,10 +35,10 @@ typedef struct IRE_STRUCTURE {
 		
 	uint mismatch_pair;
 
-} IRE_STRUCTURE;
+} IreStructure;
 
 
-typedef struct options {
+typedef struct Options {
 	char    *input_file;
 	FILE    *out_file;
 	char    *out_filename;
@@ -44,21 +52,21 @@ typedef struct options {
 	bool     format_given;
 
 	bool     no_rnafold;
-} options;
+} Options;
 
 /*==================== Function Declarations ====================*/
-static IRE_STRUCTURE *find_pairs(char *sequence);
+static IreStructure *calculate_ire_structure(char *sequence);
 static void find_ire(char *sequence, Regex *regex);
-static void determine_UTRpair(IRE_STRUCTURE *ire);
-static void lowerstem_UTRpair(IRE_STRUCTURE *ire, const uint unpaired_count);
+static void determine_UTRpair(IreStructure *ire);
+static void lowerstem_UTRpair(IreStructure *ire, const uint unpaired_count);
 static bool follow_constraints(uint no_pair, uint mismatch_pair);
 static Regex *init_regex(void);
 static char delimiter_to_char(char *user_delimiter);
-static void free_options(options *opt);
+static void free_options(Options *opt);
 
 
 void
-init_deafult_options(options *opt)
+init_deafult_options(Options *opt)
 {
 	opt->input_file     = NULL;
 	opt->out_file       = NULL;
@@ -79,7 +87,7 @@ int
 main(int argc, char *argv[])
 {
 	struct aspiire_args_info  args_info;
-	options                   opt;
+	Options                   opt;
 
 	init_deafult_options(&opt);
 
@@ -158,13 +166,12 @@ main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	aspiire_cmdline_parser_free(&args_info);
+	free(filename);
+
 	/*========================================================
 	|  Main Calculations                                     |
 	========================================================*/
-	// char *ire_seq = "CCGAGGCCGGGGCAGGGTCCCCGCGCACCG";
-	// IRE_STRUCTURE *ire = find_pairs(ire_seq);
-	// printf("%s\n",ire_seq);
-	// printf("%s\n",ire->structure);
 
 	Regex *regex = init_regex();
 	RNA_FILE *read_file = rnaf_open(opt.input_file);
@@ -172,7 +179,6 @@ main(int argc, char *argv[])
 		free_options(&opt);
 		exit(EXIT_FAILURE);
 	}
-	rnaf_rebuff(read_file, BUFFER_SIZE);
 
 	char *sequence;
 	while(true) {
@@ -201,7 +207,7 @@ find_ire(char *sequence, Regex *regex)
 	Matcher matcher;
 	uint32_t search_index = 0;
 
-	/* Search entire sequence for IREs*/
+	/* Search entire sequence for IREs using all motifs */
 	for(int i=0; i<18; i++) {
 		search_index = 0;
 		while(search_index < seq_len) {
@@ -211,14 +217,15 @@ find_ire(char *sequence, Regex *regex)
 			/* Process match. Shift buffer by search_index due to search starting from offset*/
 			int ire_start = (search_index + matcher.foundAtIndex) - 6;
 			if(ire_start > 0) {
-				char *ire_seq = substr(sequence, ire_start, 30);
-				IRE_STRUCTURE *ire = find_pairs(ire_seq);
-				if(ire != NULL && ire->is_valid) {
+				char *ire_seq = substr(sequence, ire_start, 31);
+				IreStructure *ire = calculate_ire_structure(ire_seq);
+				if(ire->is_valid) {
 					printf("%s\n",ire->sequence);
 					printf("%s\n",ire->structure);
-					free(ire->structure); free(ire);
 				}
-				free(ire_seq);
+				free(ire->structure);
+				free(ire->sequence);
+				free(ire);
 			}
 			search_index += matcher.foundAtIndex+matcher.matchLength;
 		}
@@ -226,14 +233,10 @@ find_ire(char *sequence, Regex *regex)
 }
 
 
-static IRE_STRUCTURE *
-find_pairs(char *sequence)
+static IreStructure *
+calculate_ire_structure(char *sequence)
 {
-	if(strlen(sequence) != 30) {
-		return NULL;
-	}
-
-	IRE_STRUCTURE *ire = s_malloc(sizeof *ire);
+	IreStructure *ire = s_malloc(sizeof *ire);
 	ire->paired = false;
 	ire->no_pair = 0;
 	ire->lower_pairs = 0;
@@ -243,6 +246,12 @@ find_pairs(char *sequence)
 	ire->is_valid = true;
 	ire->sequence = sequence;
 	ire->structure = strdup("......");
+
+	/* Sequence is not a valid IRE, too small :( */
+	if(strlen(sequence) != 31) {
+		ire->is_valid = false;
+		return ire;
+	}
 
 	// Loops through all first_pair nucleotides going downstream
 	for(; 4<ire->first_pair && ire->second_pair<25; ire->first_pair-=1) {
@@ -281,7 +290,7 @@ find_pairs(char *sequence)
 		ire->first_pair--;
 	}
 
-	for(; ire->second_pair<30; ire->second_pair+=1) {
+	for(; ire->second_pair<31; ire->second_pair+=1) {
 		append(&ire->structure, ".");
 	}
 	for(; ire->first_pair>=0; ire->first_pair--) {
@@ -315,7 +324,7 @@ check_pair(const char first_nucleotide, const char second_nucleotide)
 
 
 static void // Determines if the given pair (i.e., GC) is a valid pair
-determine_UTRpair(IRE_STRUCTURE *ire)
+determine_UTRpair(IreStructure *ire)
 {
 	const char first_nucleotide = ire->sequence[ire->first_pair];
 	const char second_nucleotide = ire->sequence[ire->second_pair];
@@ -353,7 +362,7 @@ determine_UTRpair(IRE_STRUCTURE *ire)
 
 /* Determines if the pair in the lower stem is a valid pair */
 static void
-lowerstem_UTRpair(IRE_STRUCTURE *ire, const uint unpaired_count)
+lowerstem_UTRpair(IreStructure *ire, const uint unpaired_count)
 {
 	const char first_nucleotide = ire->sequence[ire->first_pair];
 	const char second_nucleotide = ire->sequence[ire->second_pair];
@@ -502,7 +511,7 @@ delimiter_to_char(char *user_delimiter)
 }
 
 static void
-free_options(options *opt)
+free_options(Options *opt)
 {
 	if(opt->input_file) {
 		free(opt->input_file);
