@@ -253,7 +253,7 @@ calculate_ire_structure(char *sequence)
 		return ire;
 	}
 
-	// Loops through all first_pair nucleotides going downstream
+	/* Loops through all first_pair nucleotides going downstream */
 	for(; 4<ire->first_pair && ire->second_pair<25; ire->first_pair-=1) {
 			
 		ire->lower_pairs=0;
@@ -263,13 +263,13 @@ calculate_ire_structure(char *sequence)
 			continue;
 		}
 			
-		// Used to compare first_pair with second_pair
+		/* Used to compare first_pair with second_pair */
 		while( ire->no_pair < 2 && !ire->paired ) {
 			determine_UTRpair(ire);
 			ire->second_pair+=1;
 		}
 
-		// If the pairs do not match IRE pair constraints, then discard
+		/* If the pairs do not match IRE pair constraints, then discard */
 		if(!follow_constraints(ire->no_pair, ire->mismatch_pair)) {
 			ire->is_valid = false;
 			return ire;
@@ -277,7 +277,7 @@ calculate_ire_structure(char *sequence)
 	}
 
 	/* Check for pairs in the lower stem */
-	while(ire->first_pair >= 0) {
+	while(ire->first_pair >= 0 && ire->second_pair < 31) {
 		ire->paired = true;
 		uint unp = 0;
 
@@ -364,8 +364,15 @@ determine_UTRpair(IreStructure *ire)
 static void
 lowerstem_UTRpair(IreStructure *ire, const uint unpaired_count)
 {
-	const char first_nucleotide = ire->sequence[ire->first_pair];
-	const char second_nucleotide = ire->sequence[ire->second_pair];
+	char first_nucleotide;
+	char second_nucleotide;
+
+	if(ire->first_pair >= 0) { first_nucleotide = ire->sequence[ire->first_pair]; }
+	else { first_nucleotide = 'X'; }
+
+	if(ire->second_pair < 31) { second_nucleotide = ire->sequence[ire->second_pair]; }
+	else { second_nucleotide = 'X'; }
+
 
 	const uint pair_type = check_pair(first_nucleotide, second_nucleotide);
 
