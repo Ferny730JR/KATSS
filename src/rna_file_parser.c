@@ -503,6 +503,9 @@ determine_t_or_u(RNA_FILE *rna_file)
 		is_t = contains_t(seq);
 		is_u = contains_u(seq);
 
+		/* Free memory */
+		free(seq);
+
 		/* If sequence contained either T or U, break! */
 		if(is_t || is_u) {
 			break;
