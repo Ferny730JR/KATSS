@@ -341,6 +341,9 @@ parse_fasta(RNA_FILE *rna_file, char **ret_seq)
 			break;  /* New sequence, so break */
 		}
 
+		/* Remove trailing newline character in multiline fasta */
+		rna_file->buffer[strcspn(rna_file->buffer, "\r\n")] = '\0';
+
 		/* Append sequence found in buffer into seq variable */
 		append(&seq, rna_file->buffer);
 	}
