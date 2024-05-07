@@ -107,6 +107,8 @@ kctr_fincrement(KmerCounter *kcounter, const char *sequence)
 	int k = kcounter->k_mer;
 	unsigned int word_mask = (1 << 2*k) - 1;
 
+	if(sequence_length < k) { return; }
+
 	unsigned int hash_value = kctr_hash(sequence, 0, k);
 	kcounter->entries[hash_value]++;
 	kcounter->total_count++;
