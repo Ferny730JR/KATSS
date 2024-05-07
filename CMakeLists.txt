@@ -31,6 +31,15 @@ add_executable(SKA
     src/utils.c
 	src/Regex.c)
 
+# Build ASPIIRE
+add_executable(ASPIIRE
+	src/bin/aspiire.c
+	src/bin/aspiire_cmdl.c
+	src/rna_file_parser.c
+	src/Regex.c
+	src/string_utils.c
+	src/utils.c)
+
 # Include directories for SKA
 target_include_directories(SKA PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(SKA ZLIB::ZLIB)
@@ -42,6 +51,10 @@ find_path(VIENNARNA_INCLUDE_DIRS
     NAMES ViennaRNA/fold.h
     PATHS $ENV{HOME}/.local/include /usr/local/include)
 target_include_directories(bppPipeline PRIVATE ${VIENNARNA_INCLUDE_DIRS})
+
+# Include directories for ASPIIRE
+target_include_directories(ASPIIRE PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/bin)
+target_include_directories(ASPIIRE PRIVATE ${VIENNARNA_INCLUDE_DIRS})
 
 # Specify compiler options based on OS
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -59,12 +72,13 @@ else()
     message( SEND_ERROR "System ${CMAKE_SYSTEM_NAME} currently not supported.")
 endif()
 
-# Link bppPipeline with libraries
+# Link bppPipeline & aspiire with libraries
 find_library(LIBRARY_LRNA 
     NAMES RNA
     HINTS "$ENV{HOME}/.local/lib")
 if(LIBRARY_LRNA)
     target_link_libraries(bppPipeline PUBLIC ${LIBRARY_LRNA} ZLIB::ZLIB)
+	target_link_libraries(ASPIIRE PUBLIC ${LIBRARY_LRNA} ZLIB::ZLIB)
 else()
     message( SEND_ERROR "Couldn't find libRNA")
 endif()
