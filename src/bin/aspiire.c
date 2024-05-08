@@ -5,13 +5,23 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "utils.h"
-#include "Regex.h"
+#include "ViennaRNA/fold.h"
 #include "rna_file_parser.h"
+#include "Regex.h"
 #include "string_utils.h"
+#include "utils.h"
+
 #include "aspiire_cmdl.h"
 
 #define BUFFER_SIZE 16777216
+
+
+typedef struct SearchInfo {
+	char *sequence;
+	size_t sequence_length;
+	size_t search_index;
+	int cur_motif;
+} SearchInfo;
 
 
 typedef struct IreInfo {
@@ -20,7 +30,14 @@ typedef struct IreInfo {
 	char *gene_id;
 	char *transcript_id;
 	char *chromosome;
+
+	uint loop_type;
+	uint mismatches;
+	uint bulges;
+	char n25;
+	uint wobble;
 } IreInfo;
+
 
 typedef struct IreStructure {
 	char *sequence;
@@ -55,8 +72,10 @@ typedef struct Options {
 } Options;
 
 /*==================== Function Declarations ====================*/
+static void process_sequence(RnaInfo *rna_info, Regex *regex);
+static Matcher search_for_ire(SearchInfo *search, Regex *regex);
 static IreStructure *calculate_ire_structure(char *sequence);
-static void find_ire(char *sequence, Regex *regex);
+static void find_ire(RnaInfo *rna_info, Regex *regex);
 static void determine_UTRpair(IreStructure *ire);
 static void lowerstem_UTRpair(IreStructure *ire, const uint unpaired_count);
 static bool follow_constraints(uint no_pair, uint mismatch_pair);
@@ -180,16 +199,17 @@ main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	char *sequence;
 	while(true) {
-		sequence = rnaf_get(read_file);
+		RnaInfo info = rnaf_geti(read_file);
 
-		if(sequence == NULL) {
+		if(info.sequence == NULL) {
 			break;
 		}
 
-		find_ire(sequence, regex);
-		free(sequence);
+		process_sequence(&info, regex);
+
+		// find_ire(&info, regex);
+		rnaf_destroy(&info);
 	}
 	rnaf_close(read_file);
 
@@ -201,25 +221,96 @@ main(int argc, char *argv[])
 
 /*====================  Main functions  ====================*/
 static void
-find_ire(char *sequence, Regex *regex)
+process_sequence(RnaInfo *rna_info, Regex *regex)
 {
-	size_t seq_len = strlen(sequence);
+	SearchInfo *search = s_malloc(sizeof *search);
+	search->sequence = rna_info->sequence;
+	search->sequence_length = strlen(rna_info->sequence);
+	search->search_index = 0;
+	search->cur_motif = 0;
+
+	bool header_shown = false;
+
+	do {
+		Matcher matcher = search_for_ire(search, regex);
+		if(!matcher.isFound) {
+			search->search_index = 0;
+			search->cur_motif++; /* Match not found for specified motif, search for next one */
+			continue;
+		}
+
+		/* Get the IRE motif that was found */
+		int ire_start = (search->search_index + matcher.foundAtIndex) - 6;
+		if(ire_start < 0) { 
+			search->search_index += matcher.foundAtIndex + matcher.matchLength;
+			continue;
+		}
+		char *ire_sequence = substr(rna_info->sequence, ire_start, 31);
+
+		/* Calculate the structure of the IRE motif */
+		IreStructure *ire_structure = calculate_ire_structure(ire_sequence);
+
+		/* TODO: Compare structure with RNAfold */
+
+		/* Show header if IRE is found */
+		if(ire_structure->is_valid && !header_shown && rna_info->header) {
+			printf("%s",rna_info->header);
+			header_shown = true;
+		}
+
+		/* Dump IRE information */
+		if(ire_structure->is_valid) {
+			printf("%s\n",ire_structure->sequence);
+			printf("%s\n",ire_structure->structure);
+		}
+
+		/* Free resources */
+		free(ire_structure->structure);
+		free(ire_structure->sequence);
+		free(ire_structure);
+
+		search->search_index += matcher.foundAtIndex + matcher.matchLength;
+	} while(search->cur_motif < 18); // since there are only 18 motifs
+
+	/* free stuff */
+	free(search);
+}
+
+
+static Matcher
+search_for_ire(SearchInfo *search, Regex *regex)
+{
 	Matcher matcher;
-	uint32_t search_index = 0;
+	if(search->search_index >= search->sequence_length) {
+		matcher.isFound = false;
+		return matcher;
+	}
+	
+	matcher = regexMatch(&regex[search->cur_motif], search->sequence+search->search_index);
+	return matcher;
+}
+
+static void
+find_ire(RnaInfo *rna_info, Regex *regex)
+{
+	size_t seq_len = strlen(rna_info->sequence);
+	Matcher matcher;
+	size_t search_index = 0;
 
 	/* Search entire sequence for IREs using all motifs */
 	for(int i=0; i<18; i++) {
 		search_index = 0;
 		while(search_index < seq_len) {
-			matcher = regexMatch(&regex[i], sequence+search_index);
+			matcher = regexMatch(&regex[i], rna_info->sequence+search_index);
 			if(!matcher.isFound) { break; }
 
 			/* Process match. Shift buffer by search_index due to search starting from offset*/
 			int ire_start = (search_index + matcher.foundAtIndex) - 6;
 			if(ire_start > 0) {
-				char *ire_seq = substr(sequence, ire_start, 31);
+				char *ire_seq = substr(rna_info->sequence, ire_start, 31);
 				IreStructure *ire = calculate_ire_structure(ire_seq);
 				if(ire->is_valid) {
+					printf("%s",rna_info->header);
 					printf("%s\n",ire->sequence);
 					printf("%s\n",ire->structure);
 				}
