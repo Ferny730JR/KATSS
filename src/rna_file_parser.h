@@ -23,6 +23,12 @@ typedef struct RNA_FILE {
 } RNA_FILE;
 
 
+typedef struct RnaInfo {
+	char *header;
+	char *sequence;
+} RnaInfo;
+
+
 /**
  *  @brief Opens an RNA file for reading.
  *
@@ -52,6 +58,23 @@ RNA_FILE *rnaf_open(char *filename);
  *  sequences or an error occurs.
  */
 char *rnaf_get(RNA_FILE *rna_file);
+
+
+/**
+ * @brief Returns the sequence and header information.
+ * 
+ * @param rna_file Pointer to the RNA_FILE struct representing the opened file.
+ * @return RnaInfo 
+ */
+RnaInfo rnaf_geti(RNA_FILE *rna_file);
+
+
+/**
+ * @brief Destory the RnaInfo struct returned from rnaf_geti
+ * 
+ * @param rna_info Pointer to the RnaInfo struct
+ */
+void rnaf_destroy(RnaInfo *rna_info);
 
 
 /**

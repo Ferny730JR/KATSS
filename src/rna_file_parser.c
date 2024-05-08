@@ -23,7 +23,13 @@ static void
 parse_fasta(RNA_FILE *rna_file, char **ret_seq);
 
 static void
+parse_fastai(RNA_FILE *rna_file, RnaInfo *rna_info);
+
+static void
 parse_fastq(RNA_FILE *rna_file, char **ret_seq);
+
+static void
+parse_fastqi(RNA_FILE *rna_file, RnaInfo *rna_info);
 
 static void
 parse_reads(RNA_FILE *rna_file, char **ret_seq);
@@ -172,6 +178,38 @@ rnaf_getm(RNA_FILE *rna_file, char *match)
 
 	/* match not found in RNA_FILE, return NULL */
 	return NULL;
+}
+
+
+RnaInfo
+rnaf_geti(RNA_FILE *rna_file)
+{
+	RnaInfo rna_info = {.header = NULL, .sequence = NULL};
+
+	/* Check the type of file format */
+	switch(rna_file->filetype) {
+		case 'a':   parse_fastai(rna_file, &rna_info);    break;
+		case 'q':   parse_fastqi(rna_file, &rna_info);    break;
+		case 'r':   parse_reads(rna_file, &rna_info.sequence);    break;
+		default:
+			error_message("Unable to read sequence from file.\nCurrent supported file types are:"
+			" FASTA, FASTQ, and files containing sequences per line.");
+			break;
+	}
+
+	return rna_info;
+}
+
+
+void
+rnaf_destroy(RnaInfo *rna_info)
+{
+	if(rna_info->sequence) {
+		free(rna_info->sequence);
+	}
+	if(rna_info->header) {
+		free(rna_info->header);
+	}
 }
 
 
@@ -329,7 +367,7 @@ rnaf_numlines(RNA_FILE *rna_file)
 
 static void
 parse_fasta(RNA_FILE *rna_file, char **ret_seq) 
-{   /* Init seq, will be realloc'd based on input stream */
+{	/* Init seq, will be realloc'd based on input stream */
 	char    *seq = NULL;
 
 	while(gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size)) {
@@ -350,6 +388,33 @@ parse_fasta(RNA_FILE *rna_file, char **ret_seq)
 
 	/* Have ret_seq point to new seq */
 	*ret_seq = seq;
+}
+
+
+static void
+parse_fastai(RNA_FILE *rna_file, RnaInfo *rna_info) 
+{	/* Init seq, will be realloc'd based on input stream */
+	char    *seq = NULL;
+
+	while(gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size)) {
+		if (rna_file->buffer[0] == '>') {
+			/* If buffer wasn't large enough to store header, keep reading */
+			while(is_full(rna_file->buffer, rna_file->buffer_size)) {
+				gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size);
+			}
+			rna_info->header = strdup(rna_file->buffer);
+			break;  /* New sequence, so break */
+		}
+
+		/* Remove trailing newline character in multiline fasta */
+		rna_file->buffer[strcspn(rna_file->buffer, "\r\n")] = '\0';
+
+		/* Append sequence found in buffer into seq variable */
+		append(&seq, rna_file->buffer);
+	}
+
+	/* Have ret_seq point to new seq */
+	rna_info->sequence = seq;
 }
 
 
@@ -384,6 +449,41 @@ parse_fastq(RNA_FILE *rna_file, char **ret_seq)
 
 	/* Have ret_seq point to new seq */
 	*ret_seq = seq;
+}
+
+
+static void
+parse_fastqi(RNA_FILE *rna_file, RnaInfo *rna_info) 
+{
+	char            *seq = NULL; /* Init seq, will be realloc'd based on input stream */
+	unsigned int    reading_seq = 1;
+	unsigned int	current_iter = 0;
+
+	while(gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size)) {
+		current_iter+=1;
+
+		if(rna_file->buffer[0] == '@' && current_iter == 4) {
+			/* If buffer wasn't large enough to store header, keep reading */
+			while(is_full(rna_file->buffer, rna_file->buffer_size)) {
+				gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size);
+			}
+			rna_info->header = strdup(rna_file->buffer);
+			break;  /* New sequence, so break */
+		}
+
+		if(rna_file->buffer[0] == '+') {
+			reading_seq = 0;
+			continue;   /* Reading from metadata, so skip iteration */
+		}
+
+		/* Append sequence found in buffer into seq variable */
+		if(reading_seq) {
+			append(&seq, rna_file->buffer);
+		}
+	}
+
+	/* Have ret_seq point to new seq */
+	rna_info->sequence = seq;
 }
 
 
