@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "ViennaRNA/fold.h"
+#include "ire_fold.h"
 #include "rna_file_parser.h"
 #include "Regex.h"
 #include "string_utils.h"
@@ -27,19 +28,18 @@ typedef struct SearchInfo {
 typedef struct IreInfo {
 	char *sequence;
 	char *structure;
-	char *gene_id;
-	char *transcript_id;
-	char *chromosome;
+	char *v_struct;
+	float mfe;
 
 	uint loop_type;
-	uint mismatches;
+	uint noGU;
 	uint bulges;
 	char n25;
 	uint wobble;
 } IreInfo;
 
 
-typedef struct IreStructure {
+typedef struct IreFold {
 	char *sequence;
 	char *structure;
 	bool is_valid;
@@ -52,7 +52,7 @@ typedef struct IreStructure {
 		
 	uint mismatch_pair;
 
-} IreStructure;
+} IreFold;
 
 
 typedef struct Options {
@@ -74,10 +74,10 @@ typedef struct Options {
 /*==================== Function Declarations ====================*/
 static void process_sequence(RnaInfo *rna_info, Regex *regex);
 static Matcher search_for_ire(SearchInfo *search, Regex *regex);
-static IreStructure *calculate_ire_structure(char *sequence);
-static void find_ire(RnaInfo *rna_info, Regex *regex);
-static void determine_UTRpair(IreStructure *ire);
-static void lowerstem_UTRpair(IreStructure *ire, const uint unpaired_count);
+static void compare_rnafold(IreFold *ire_structure);
+static IreFold *calculate_ire_structure(char *sequence);
+static void determine_UTRpair(IreFold *ire);
+static void lowerstem_UTRpair(IreFold *ire, const uint unpaired_count);
 static bool follow_constraints(uint no_pair, uint mismatch_pair);
 static Regex *init_regex(void);
 static char delimiter_to_char(char *user_delimiter);
@@ -208,7 +208,6 @@ main(int argc, char *argv[])
 
 		process_sequence(&info, regex);
 
-		// find_ire(&info, regex);
 		rnaf_destroy(&info);
 	}
 	rnaf_close(read_file);
@@ -240,34 +239,38 @@ process_sequence(RnaInfo *rna_info, Regex *regex)
 		}
 
 		/* Get the IRE motif that was found */
-		int ire_start = (search->search_index + matcher.foundAtIndex) - 6;
+		int ire_start = (search->search_index + matcher.foundAtIndex) - 7;
 		if(ire_start < 0) { 
 			search->search_index += matcher.foundAtIndex + matcher.matchLength;
 			continue;
 		}
-		char *ire_sequence = substr(rna_info->sequence, ire_start, 31);
+		char *ire_sequence = substr(rna_info->sequence, ire_start, 32);
 
 		/* Calculate the structure of the IRE motif */
-		IreStructure *ire_structure = calculate_ire_structure(ire_sequence);
+		// IreFold *ire_structure = calculate_ire_structure(ire_sequence);
+		IreStructure *ire_structure = predict_ire(ire_sequence);
 
 		/* TODO: Compare structure with RNAfold */
+		// some function to compare structure with RNAfold...
+
+		/* TODO: Get a quality score of the IRE */
+		// some function to get the quality of the found IRE...
 
 		/* Show header if IRE is found */
-		if(ire_structure->is_valid && !header_shown && rna_info->header) {
+		if(ire_structure->quality > 0 && !header_shown && rna_info->header) {
 			printf("%s",rna_info->header);
 			header_shown = true;
 		}
 
-		/* Dump IRE information */
-		if(ire_structure->is_valid) {
-			printf("%s\n",ire_structure->sequence);
-			printf("%s\n",ire_structure->structure);
+		if(ire_structure->quality > 0)	{
+			if(search->cur_motif < 3) ire_structure->quality+=3;
+			printf("%s\n", ire_structure->sequence);
+			printf("%s\t[ %u ]\n", ire_structure->structure,ire_structure->quality);
 		}
 
 		/* Free resources */
-		free(ire_structure->structure);
-		free(ire_structure->sequence);
-		free(ire_structure);
+		free(ire_sequence);
+		irestruct_destroy(ire_structure);
 
 		search->search_index += matcher.foundAtIndex + matcher.matchLength;
 	} while(search->cur_motif < 18); // since there are only 18 motifs
@@ -290,44 +293,35 @@ search_for_ire(SearchInfo *search, Regex *regex)
 	return matcher;
 }
 
+
 static void
-find_ire(RnaInfo *rna_info, Regex *regex)
+compare_rnafold(IreFold *ire_structure)
 {
-	size_t seq_len = strlen(rna_info->sequence);
-	Matcher matcher;
-	size_t search_index = 0;
+	char *sequence = ire_structure->sequence;
+	char *structure = s_malloc(sizeof(char) * strlen(sequence) + 1);
 
-	/* Search entire sequence for IREs using all motifs */
-	for(int i=0; i<18; i++) {
-		search_index = 0;
-		while(search_index < seq_len) {
-			matcher = regexMatch(&regex[i], rna_info->sequence+search_index);
-			if(!matcher.isFound) { break; }
+	/* Get the fold compound from sequence */
+	vrna_fold_compound_t *fc = vrna_fold_compound(sequence, NULL, VRNA_OPTION_DEFAULT);
 
-			/* Process match. Shift buffer by search_index due to search starting from offset*/
-			int ire_start = (search_index + matcher.foundAtIndex) - 6;
-			if(ire_start > 0) {
-				char *ire_seq = substr(rna_info->sequence, ire_start, 31);
-				IreStructure *ire = calculate_ire_structure(ire_seq);
-				if(ire->is_valid) {
-					printf("%s",rna_info->header);
-					printf("%s\n",ire->sequence);
-					printf("%s\n",ire->structure);
-				}
-				free(ire->structure);
-				free(ire->sequence);
-				free(ire);
-			}
-			search_index += matcher.foundAtIndex+matcher.matchLength;
-		}
-	}
+	/* Add structure constraints to fold */
+	const char *cstruct = "......|x|....xxxxxx.............";
+	vrna_constraints_add(fc, cstruct, VRNA_CONSTRAINT_DB_DEFAULT);
+
+	/* Predict the minimum free energy & structure */
+	float mfe = vrna_mfe(fc, structure);
+
+	printf("%s\n%s [ %6.2f ]\n", sequence, structure, mfe);
+
+	/* Cleanup */
+	free(structure);
+	vrna_fold_compound_free(fc);
 }
 
 
-static IreStructure *
+static IreFold *
 calculate_ire_structure(char *sequence)
 {
-	IreStructure *ire = s_malloc(sizeof *ire);
+	IreFold *ire = s_malloc(sizeof *ire);
 	ire->paired = false;
 	ire->no_pair = 0;
 	ire->lower_pairs = 0;
@@ -415,7 +409,7 @@ check_pair(const char first_nucleotide, const char second_nucleotide)
 
 
 static void // Determines if the given pair (i.e., GC) is a valid pair
-determine_UTRpair(IreStructure *ire)
+determine_UTRpair(IreFold *ire)
 {
 	const char first_nucleotide = ire->sequence[ire->first_pair];
 	const char second_nucleotide = ire->sequence[ire->second_pair];
@@ -453,7 +447,7 @@ determine_UTRpair(IreStructure *ire)
 
 /* Determines if the pair in the lower stem is a valid pair */
 static void
-lowerstem_UTRpair(IreStructure *ire, const uint unpaired_count)
+lowerstem_UTRpair(IreFold *ire, const uint unpaired_count)
 {
 	char first_nucleotide;
 	char second_nucleotide;
@@ -531,24 +525,24 @@ follow_constraints(uint no_pair, uint mismatch_pair)
 static Regex *
 init_regex(void)
 {
-	const char *canonical_motif_1 = "C.....CAGTG[CTAG]";
-	const char *canonical_motif_2 = "C.....CAGAG[CAT]";
-	const char *selex_motif_1 =     "C.....CTGTG[TC]";
-	const char *selex_motif_2 =     "C.....CCGTG[ATC]";
+	const char *canonical_motif_1 = "C.....CAG[TG]G[CUTAG]";
+	const char *canonical_motif_2 = "C.....CAGAG[CATU]";
+	const char *selex_motif_1 =     "C.....C[TU]G[TU]G[TUC]";
+	const char *selex_motif_2 =     "C.....CCG[TU]G[ATUC]";
 	const char *selex_motif_3 =     "C.....CCGAGA";
-	const char *selex_motif_4 =     "C.....CTTAGC";
-	const char *selex_motif_5 =     "C.....CAATGC";
-	const char *selex_motif_6 =     "C.....CAGGG[ACTG]";
-	const char *selex_motif_7 =     "C.....TAGTA[CT]";
-	const char *selex_motif_8 =     "C.....TAGGAT";
-	const char *selex_motif_9 =     "C.....TAGAA[TC]";
-	const char *selex_motif_10 =    "C.....TAGCAG";
-	const char *selex_motif_11 =    "C.....GAGTC[GA]";
+	const char *selex_motif_4 =     "C.....C[TU][TU]AGC";
+	const char *selex_motif_5 =     "C.....CAA[TU]GC";
+	const char *selex_motif_6 =     "C.....CAGGG[ACTUG]";
+	const char *selex_motif_7 =     "C.....[TU]AG[TU]A[CTU]";
+	const char *selex_motif_8 =     "C.....[TU]AGGA[TU]";
+	const char *selex_motif_9 =     "C.....[TU]AGAA[TUC]";
+	const char *selex_motif_10 =    "C.....[TU]AGCAG";
+	const char *selex_motif_11 =    "C.....GAG[TU]C[GA]";
 	const char *selex_motif_12 =    "C.....GAGCC[GA]";
-	const char *selex_motif_13 =    "C.....GAGAG[TG]";
-	const char *selex_motif_14 =    "C.....GGGAG[CTAG]";
-	const char *selex_motif_15 =    "C.....GAGUG[TA]";
-	const char *selex_motif_16 =    "G.....CAGTGA";
+	const char *selex_motif_13 =    "C.....GAGAG[TUG]";
+	const char *selex_motif_14 =    "C.....GGGAG[CTUAG]";
+	const char *selex_motif_15 =    "C.....GAG[TU]G[TUA]";
+	const char *selex_motif_16 =    "G.....CAG[TU]GA";
 
 	Regex *regex = s_malloc(18 * sizeof *regex);
 	regexCompile(&regex[0], canonical_motif_1);
