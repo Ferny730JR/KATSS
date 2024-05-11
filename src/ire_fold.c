@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "ire_fold.h"
 #include "utils.h"
@@ -10,6 +11,8 @@
 IreStructure *predict_ire(const char *sequence);
 void irestruct_destroy(IreStructure *ire_structure);
 static IreStructure *irestruct_init(const char *sequence);
+static bool worth_testing(const char *sequence);
+static inline uint worth_testing_h(const char *sequence, int left, int right);
 static inline uint predict_ire_h(IreStructure *ire_structure, int left, int right);
 static inline uint get_max(IreStructure *ire, int left, int right);
 static inline uint score_structure(const char *sequence, const char *structure);
@@ -23,6 +26,11 @@ IreStructure *
 predict_ire(const char *sequence)
 {
 	IreStructure *ire_structure = irestruct_init(sequence);
+	if(!worth_testing(sequence)) {
+		ire_structure->quality = 0;
+		return ire_structure;
+	}
+
 	uint weight = predict_ire_h(ire_structure, 12, 19);
 	if(weight != 0) {
 		for(int i=0; i<13; i++) {
@@ -165,6 +173,34 @@ irestruct_init(const char *sequence)
 	}
 
 	return ire_struct;
+}
+
+
+static bool
+worth_testing(const char *sequence)
+{
+	// Check upper stem to determine if worth predicting entire structure
+	int num_pairs = worth_testing_h(sequence, 12, 19);
+	return num_pairs > 4;
+}
+
+
+static inline uint
+worth_testing_h(const char *sequence, int left, int right)
+{
+	if(left < 8 || right > 24) {
+		return 0;
+	}
+
+	uint pair_type = check_pair(sequence[left], sequence[right]);
+
+	uint rscore = worth_testing_h(sequence, left, right+1);
+	uint lscore = worth_testing_h(sequence, left-1, right);
+	uint mscore = worth_testing_h(sequence, left-1, right+1);
+
+	uint score = max3(rscore, lscore, mscore);
+
+	return score+(pair_type > 0);
 }
 
 
