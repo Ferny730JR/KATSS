@@ -26,7 +26,7 @@ IreStructure *
 predict_ire(const char *sequence)
 {
 	IreStructure *ire_structure = irestruct_init(sequence);
-	if(!worth_testing(sequence)) {
+	if(strlen(sequence) != 32 || !worth_testing(sequence)) {
 		ire_structure->quality = 0;
 		return ire_structure;
 	}
@@ -103,7 +103,7 @@ get_max(IreStructure *ire, int left, int right)
 static inline uint
 score_structure(const char *sequence, const char *structure)
 {
-	uint score = 5;
+	uint score = 4;
 	uint num_upper_pairs = 0;
 	uint num_lower_pairs = 0;
 	uint num_upper_bulge = 0;
@@ -219,7 +219,6 @@ check_pair(const char first_nucleotide, const char second_nucleotide)
 	/* Define a mapping between nucleotide pairs and return values */
     const char         *pairs = "GC CG AT TA AU UA TG GT UG GU";
     const uint return_values[] = {1, 1, 1, 1, 1, 1, 2, 2, 2, 2};
-	// const uint return_values[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
     
     /* Iterate over pairs and compare with the input nucleotides */
     for (int i = 0; i < 10; ++i) {
