@@ -80,6 +80,12 @@ struct aspiire_args_info
  (default=off).  */
   const char *no_rnafold_help; /**< @brief Don't compare IRE folds with RNAfold. Only use this if you are encountering performance issues.
  help description.  */
+  int jobs_arg;	/**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
+ (default='0').  */
+  char * jobs_orig;	/**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
+ original value given at command line.  */
+  const char *jobs_help; /**< @brief Separate the files into separate jobs and start processing them in parallel using multiple threads.
+ help description.  */
   
   unsigned int help_given ;	/**< @brief Whether help was given.  */
   unsigned int detailed_help_given ;	/**< @brief Whether detailed-help was given.  */
@@ -91,6 +97,7 @@ struct aspiire_args_info
   unsigned int format_given ;	/**< @brief Whether format was given.  */
   unsigned int file_delimiter_given ;	/**< @brief Whether file-delimiter was given.  */
   unsigned int no_rnafold_given ;	/**< @brief Whether no-rnafold was given.  */
+  unsigned int jobs_given ;	/**< @brief Whether jobs was given.  */
 
   char **inputs ; /**< @brief unnamed options (options without names) */
   unsigned inputs_num ; /**< @brief unnamed options number */

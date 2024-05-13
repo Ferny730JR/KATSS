@@ -74,3 +74,11 @@ option "no-rnafold" -
 "Don't compare IRE folds with RNAfold. Only use this if you are encountering performance issues.\n"
 flag
 off
+
+option "jobs" j
+"Separate the files into separate jobs and start processing them in parallel using multiple\
+ threads.\n"
+int
+typestr="number"
+default="0"
+argoptional

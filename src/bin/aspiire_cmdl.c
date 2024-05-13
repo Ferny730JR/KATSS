@@ -30,7 +30,7 @@ const char *aspiire_args_info_usage = "Usage: ASPIIRE [OPTIONS] [<feature_annota
 
 const char *aspiire_args_info_versiontext = "";
 
-const char *aspiire_args_info_description = "The Streaming K-mer Analysis is a C program designed to analyze RNA sequences\nand identify enriched motifs in protein-bound RNA.\nThe program follows a structured pipeline that includes k-mer counting,\nfrequency calculations, and enrichment analysis, producing a CSV file with\nranked k-mers based on their likelihood of being a motif.";
+const char *aspiire_args_info_description = "ASPIIRE is a C program designed to detect and potential IREs in a sequence.\nThe program follows a structured pipeline that includes k-mer counting,\nfrequency calculations, and enrichment analysis, producing a CSV file with\nranked k-mers based on their likelihood of being a motif.";
 
 const char *aspiire_args_info_detailed_help[] = {
   "  -h, --help                 Print help and exit",
@@ -51,6 +51,7 @@ const char *aspiire_args_info_detailed_help[] = {
   "  -d, --file-delimiter=char  Set the delimiter used to separate the values in\n                               the output file.\n                                 (default=`,')",
   "  The output of aspiire by default is in csv format, meaning the values are\n  comma delimited. By specifying this option, you can change the delimiter used\n  to separate the values. The available delimiters are: comma (,), tab ('t'),\n  colon (:), vertical bar (|), and space (\" \")\n  For example, setting the file delimiter option to:\n   \t--file-delimiter=\" \"\n  will change the delimiter to be space separated. Support for other delimiters\n  is currently unavailable.\n",
   "      --no-rnafold           Don't compare IRE folds with RNAfold. Only use\n                               this if you are encountering performance issues.\n                                 (default=off)",
+  "  -j, --jobs[=number]        Separate the files into separate jobs and start\n                               processing them in parallel using multiple\n                               threads.\n                                 (default=`0')",
     0
 };
 
@@ -69,11 +70,12 @@ init_help_array(void)
   aspiire_args_info_help[9] = aspiire_args_info_detailed_help[13];
   aspiire_args_info_help[10] = aspiire_args_info_detailed_help[15];
   aspiire_args_info_help[11] = aspiire_args_info_detailed_help[17];
-  aspiire_args_info_help[12] = 0; 
+  aspiire_args_info_help[12] = aspiire_args_info_detailed_help[18];
+  aspiire_args_info_help[13] = 0; 
   
 }
 
-const char *aspiire_args_info_help[13];
+const char *aspiire_args_info_help[14];
 
 typedef enum {ARG_NO
   , ARG_FLAG
@@ -107,6 +109,7 @@ void clear_given (struct aspiire_args_info *args_info)
   args_info->format_given = 0 ;
   args_info->file_delimiter_given = 0 ;
   args_info->no_rnafold_given = 0 ;
+  args_info->jobs_given = 0 ;
 }
 
 static
@@ -126,6 +129,8 @@ void clear_args (struct aspiire_args_info *args_info)
   args_info->file_delimiter_arg = gengetopt_strdup (",");
   args_info->file_delimiter_orig = NULL;
   args_info->no_rnafold_flag = 0;
+  args_info->jobs_arg = 0;
+  args_info->jobs_orig = NULL;
   
 }
 
@@ -144,6 +149,7 @@ void init_args_info(struct aspiire_args_info *args_info)
   args_info->format_help = aspiire_args_info_detailed_help[13] ;
   args_info->file_delimiter_help = aspiire_args_info_detailed_help[15] ;
   args_info->no_rnafold_help = aspiire_args_info_detailed_help[17] ;
+  args_info->jobs_help = aspiire_args_info_detailed_help[18] ;
   
 }
 
@@ -255,6 +261,7 @@ aspiire_cmdline_parser_release (struct aspiire_args_info *args_info)
   free_string_field (&(args_info->format_orig));
   free_string_field (&(args_info->file_delimiter_arg));
   free_string_field (&(args_info->file_delimiter_orig));
+  free_string_field (&(args_info->jobs_orig));
   
   
   for (i = 0; i < args_info->inputs_num; ++i)
@@ -310,6 +317,8 @@ aspiire_cmdline_parser_dump(FILE *outfile, struct aspiire_args_info *args_info)
     write_into_file(outfile, "file-delimiter", args_info->file_delimiter_orig, 0);
   if (args_info->no_rnafold_given)
     write_into_file(outfile, "no-rnafold", 0, 0 );
+  if (args_info->jobs_given)
+    write_into_file(outfile, "jobs", args_info->jobs_orig, 0);
   
 
   i = EXIT_SUCCESS;
@@ -1177,6 +1186,7 @@ aspiire_cmdline_parser_internal (
         { "format",	1, NULL, 0 },
         { "file-delimiter",	1, NULL, 'd' },
         { "no-rnafold",	0, NULL, 0 },
+        { "jobs",	2, NULL, 'j' },
         { 0,  0, 0, 0 }
       };
 
@@ -1185,7 +1195,7 @@ aspiire_cmdline_parser_internal (
       custom_opterr = opterr;
       custom_optopt = optopt;
 
-      c = custom_getopt_long (argc, argv, "hVi:o:k:t:d:", long_options, &option_index);
+      c = custom_getopt_long (argc, argv, "hVi:o:k:t:d:j::", long_options, &option_index);
 
       optarg = custom_optarg;
       optind = custom_optind;
@@ -1267,6 +1277,19 @@ aspiire_cmdline_parser_internal (
               &(local_args_info.file_delimiter_given), optarg, 0, ",", ARG_STRING,
               check_ambiguity, override, 0, 0,
               "file-delimiter", 'd',
+              additional_error))
+            goto failure;
+        
+          break;
+        case 'j':	/* Separate the files into separate jobs and start processing them in parallel using multiple threads.
+.  */
+        
+        
+          if (update_arg( (void *)&(args_info->jobs_arg), 
+               &(args_info->jobs_orig), &(args_info->jobs_given),
+              &(local_args_info.jobs_given), optarg, 0, "0", ARG_INT,
+              check_ambiguity, override, 0, 0,
+              "jobs", 'j',
               additional_error))
             goto failure;
         
