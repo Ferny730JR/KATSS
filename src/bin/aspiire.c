@@ -5,12 +5,14 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "ViennaRNA/fold.h"
-#include "ire_fold.h"
 #include "rna_file_parser.h"
+#include "ire_fold.h"
 #include "Regex.h"
 #include "string_utils.h"
 #include "utils.h"
+#include "parallel_helpers.h"
+
+#include "ViennaRNA/fold.h"
 
 #include "aspiire_cmdl.h"
 
@@ -69,17 +71,30 @@ typedef struct Options {
 	bool     format_given;
 
 	bool     no_rnafold;
+
+	int      jobs;
 } Options;
 
+
+typedef struct RecordData {
+	char    *sequence;
+	char    *header;
+	Regex   *regex;
+} RecordData;
+
 /*==================== Function Declarations ====================*/
-static void process_sequence(RnaInfo *rna_info, Regex *regex);
+// static void process_sequence(RnaInfo *rna_info, Regex *regex);
+static void process_sequence(RecordData *record);
 static Matcher search_for_ire(SearchInfo *search, Regex *regex);
 static void compare_rnafold(IreFold *ire_structure);
 static IreFold *calculate_ire_structure(char *sequence);
 static void determine_UTRpair(IreFold *ire);
 static void lowerstem_UTRpair(IreFold *ire, const uint unpaired_count);
 static bool follow_constraints(uint no_pair, uint mismatch_pair);
+
+static int get_num_threads(struct aspiire_args_info args_info);
 static Regex *init_regex(void);
+RecordData *copy_record_data(RnaInfo rna_info, Regex *regex);
 static char delimiter_to_char(char *user_delimiter);
 static void free_options(Options *opt);
 
@@ -100,6 +115,8 @@ init_deafult_options(Options *opt)
 	opt->format_given   = false;
 
 	opt->no_rnafold     = false;
+
+	opt->jobs           = 0;
 }
 
 int
@@ -176,6 +193,8 @@ main(int argc, char *argv[])
 		opt.no_rnafold = true;
 	}
 
+	opt.jobs = get_num_threads(args_info);
+
 	char *filename = concat(opt.out_filename, ".dsv");
 	opt.out_file = fopen(filename, "w");
 	if (opt.out_file == NULL) {
@@ -199,6 +218,7 @@ main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	INIT_PARALLELIZATION(opt.jobs);
 	while(true) {
 		RnaInfo info = rnaf_geti(read_file);
 
@@ -206,11 +226,10 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		process_sequence(&info, regex);
-
-		rnaf_destroy(&info);
+		RUN_IN_PARALLEL(process_sequence, copy_record_data(info, regex));
 	}
 	rnaf_close(read_file);
+	UNINIT_PARALLELIZATION
 
 	/* Clean up */
 	free(regex);
@@ -220,18 +239,18 @@ main(int argc, char *argv[])
 
 /*====================  Main functions  ====================*/
 static void
-process_sequence(RnaInfo *rna_info, Regex *regex)
+process_sequence(RecordData *record)
 {
 	SearchInfo *search = s_malloc(sizeof *search);
-	search->sequence = rna_info->sequence;
-	search->sequence_length = strlen(rna_info->sequence);
+	search->sequence = record->sequence;
+	search->sequence_length = strlen(record->sequence);
 	search->search_index = 0;
 	search->cur_motif = 0;
 
 	bool header_shown = false;
 
 	do {
-		Matcher matcher = search_for_ire(search, regex);
+		Matcher matcher = search_for_ire(search, record->regex);
 		if(!matcher.isFound) {
 			search->search_index = 0;
 			search->cur_motif++; /* Match not found for specified motif, search for next one */
@@ -244,21 +263,14 @@ process_sequence(RnaInfo *rna_info, Regex *regex)
 			search->search_index += matcher.foundAtIndex + matcher.matchLength;
 			continue;
 		}
-		char *ire_sequence = substr(rna_info->sequence, ire_start, 32);
+		char *ire_sequence = substr(record->sequence, ire_start, 32);
 
 		/* Calculate the structure of the IRE motif */
-		// IreFold *ire_structure = calculate_ire_structure(ire_sequence);
 		IreStructure *ire_structure = predict_ire(ire_sequence);
 
-		/* TODO: Compare structure with RNAfold */
-		// some function to compare structure with RNAfold...
-
-		/* TODO: Get a quality score of the IRE */
-		// some function to get the quality of the found IRE...
-
 		/* Show header if IRE is found */
-		if(ire_structure->quality > 0 && !header_shown && rna_info->header) {
-			printf("%s",rna_info->header);
+		if(ire_structure->quality > 0 && !header_shown && record->header) {
+			printf("%s",record->header);
 			header_shown = true;
 		}
 
@@ -276,6 +288,9 @@ process_sequence(RnaInfo *rna_info, Regex *regex)
 	} while(search->cur_motif < 18); // since there are only 18 motifs
 
 	/* free stuff */
+	free(record->sequence);
+	if(record->header) free(record->header);
+	free(record);
 	free(search);
 }
 
@@ -522,6 +537,31 @@ follow_constraints(uint no_pair, uint mismatch_pair)
 
 
 /*==================== Helper functions ====================*/
+static int
+get_num_threads(struct aspiire_args_info args_info)
+{
+    int thread_max = max_user_threads();
+    int num_threads = 0;
+
+    if(args_info.jobs_given) {
+        num_threads = MIN2(thread_max, args_info.jobs_arg);
+    } else {
+        /* use maximum of concurrent threads */
+        int proc_cores, proc_cores_conf;
+        if (num_proc_cores(&proc_cores, &proc_cores_conf)) {
+            num_threads = MIN2(thread_max, proc_cores_conf);
+        } else {
+			warning_message("Could not determine number of available processor cores!\n"
+			                "Defaulting to serial computation.");
+            num_threads = 1;
+        }
+    }
+    num_threads = MAX2(1, num_threads);
+
+    return num_threads;
+}
+
+
 static Regex *
 init_regex(void)
 {
@@ -565,6 +605,18 @@ init_regex(void)
 	regexCompile(&regex[17], selex_motif_16);
 
 	return regex;
+}
+
+
+RecordData *
+copy_record_data(RnaInfo rna_info, Regex *regex) {
+    RecordData *new_data = s_malloc(sizeof *new_data);
+	
+	new_data->sequence      = rna_info.sequence;
+	new_data->header        = rna_info.header;
+    new_data->regex         = regex;
+
+    return new_data;
 }
 
 
