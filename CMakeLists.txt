@@ -31,14 +31,18 @@ add_executable(SKA
     src/utils.c
 	src/Regex.c)
 
-# Build ASPIIRE
-add_executable(ASPIIRE
+# Build aspiire
+add_executable(aspiire
 	src/bin/aspiire.c
 	src/bin/aspiire_cmdl.c
 	src/rna_file_parser.c
 	src/Regex.c
+	src/ire_fold.c
+	src/levenshtein.c
 	src/string_utils.c
-	src/utils.c)
+	src/utils.c
+	src/parallel_helpers.c
+	src/c_thread_pool/thpool.c)
 
 # Include directories for SKA
 target_include_directories(SKA PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
@@ -52,9 +56,10 @@ find_path(VIENNARNA_INCLUDE_DIRS
     PATHS $ENV{HOME}/.local/include /usr/local/include)
 target_include_directories(bppPipeline PRIVATE ${VIENNARNA_INCLUDE_DIRS})
 
-# Include directories for ASPIIRE
-target_include_directories(ASPIIRE PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/bin)
-target_include_directories(ASPIIRE PRIVATE ${VIENNARNA_INCLUDE_DIRS})
+# Include directories for aspiire
+target_include_directories(aspiire PRIVATE src/c_thread_pool)
+target_include_directories(aspiire PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/bin)
+target_include_directories(aspiire PRIVATE ${VIENNARNA_INCLUDE_DIRS})
 
 # Specify compiler options based on OS
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -68,6 +73,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin") # Apple
     target_compile_options(SKA PRIVATE -g -Wall -Wextra -Wpedantic -flto -O3)
     target_compile_options(bppPipeline PRIVATE -g -Wall -flto -O3)
+	target_compile_options(aspiire PRIVATE -Wall -Wextra -flto -O3)
 else()
     message( SEND_ERROR "System ${CMAKE_SYSTEM_NAME} currently not supported.")
 endif()
@@ -78,7 +84,7 @@ find_library(LIBRARY_LRNA
     HINTS "$ENV{HOME}/.local/lib")
 if(LIBRARY_LRNA)
     target_link_libraries(bppPipeline PUBLIC ${LIBRARY_LRNA} ZLIB::ZLIB)
-	target_link_libraries(ASPIIRE PUBLIC ${LIBRARY_LRNA} ZLIB::ZLIB)
+	target_link_libraries(aspiire PUBLIC ${LIBRARY_LRNA} ZLIB::ZLIB)
 else()
     message( SEND_ERROR "Couldn't find libRNA")
 endif()
