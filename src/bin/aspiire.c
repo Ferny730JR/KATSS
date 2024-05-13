@@ -299,7 +299,7 @@ compare_rnafold(IreStructure *ire_structure)
 	float mfe = vrna_mfe(fc, structure);
 
 	/* Update quality score based on mfe */
-	float mfe_percent_change = (fabsf(mfe) - fabsf(best_mfe)) / fabsf(best_mfe);
+	float mfe_percent_change = fabsf(mfe - best_mfe) / fabsf((mfe + best_mfe)/2);
 	if(mfe < 0) {
 		ire_structure->quality += 2*(1 - mfe_percent_change);
 	}
