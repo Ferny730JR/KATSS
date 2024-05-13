@@ -4,10 +4,12 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
+#include <math.h>
 
 #include "rna_file_parser.h"
 #include "ire_fold.h"
 #include "Regex.h"
+#include "levenshtein.h"
 #include "string_utils.h"
 #include "utils.h"
 #include "parallel_helpers.h"
@@ -27,34 +29,11 @@ typedef struct SearchInfo {
 } SearchInfo;
 
 
-typedef struct IreInfo {
-	char *sequence;
-	char *structure;
-	char *v_struct;
-	float mfe;
-
-	uint loop_type;
-	uint noGU;
-	uint bulges;
-	char n25;
-	uint wobble;
-} IreInfo;
-
-
-typedef struct IreFold {
-	char *sequence;
-	char *structure;
-	bool is_valid;
-
-	bool paired;        // Determine if IRE is paired (idk tbh)
-	uint no_pair;       // Number of times a nucleotide in the upper stem is unpaired
-	uint lower_pairs;   // The number of nucleotide pairs in the lower stem
-	int  first_pair;    // Position of the first pair
-	uint second_pair;   // Position of the complementing nucleotide of the first pair
-		
-	uint mismatch_pair;
-
-} IreFold;
+typedef struct RecordData {
+	char    *sequence;
+	char    *header;
+	Regex   *regex;
+} RecordData;
 
 
 typedef struct Options {
@@ -75,28 +54,17 @@ typedef struct Options {
 	int      jobs;
 } Options;
 
-
-typedef struct RecordData {
-	char    *sequence;
-	char    *header;
-	Regex   *regex;
-} RecordData;
-
 /*==================== Function Declarations ====================*/
-// static void process_sequence(RnaInfo *rna_info, Regex *regex);
-static void process_sequence(RecordData *record);
+void    process_sequence(RecordData *record);
 static Matcher search_for_ire(SearchInfo *search, Regex *regex);
-static void compare_rnafold(IreFold *ire_structure);
-static IreFold *calculate_ire_structure(char *sequence);
-static void determine_UTRpair(IreFold *ire);
-static void lowerstem_UTRpair(IreFold *ire, const uint unpaired_count);
-static bool follow_constraints(uint no_pair, uint mismatch_pair);
+static void    compare_rnafold(IreStructure *ire_structure);
+static float   compare_structures(const char *struct_iref, const char *struct_vrna);
 
-static int get_num_threads(struct aspiire_args_info args_info);
-static Regex *init_regex(void);
-RecordData *copy_record_data(RnaInfo rna_info, Regex *regex);
-static char delimiter_to_char(char *user_delimiter);
-static void free_options(Options *opt);
+static int     get_num_threads(struct aspiire_args_info args_info);
+static Regex  *init_regex(void);
+RecordData    *copy_record_data(RnaInfo rna_info, Regex *regex);
+static char    delimiter_to_char(char *user_delimiter);
+static void    free_options(Options *opt);
 
 
 void
@@ -238,7 +206,7 @@ main(int argc, char *argv[])
 }
 
 /*====================  Main functions  ====================*/
-static void
+void
 process_sequence(RecordData *record)
 {
 	SearchInfo *search = s_malloc(sizeof *search);
@@ -268,6 +236,10 @@ process_sequence(RecordData *record)
 		/* Calculate the structure of the IRE motif */
 		IreStructure *ire_structure = predict_ire(ire_sequence);
 
+		if(ire_structure->quality > 0) {
+			compare_rnafold(ire_structure);
+		}
+
 		/* Show header if IRE is found */
 		if(ire_structure->quality > 0 && !header_shown && record->header) {
 			printf("%s",record->header);
@@ -275,9 +247,9 @@ process_sequence(RecordData *record)
 		}
 
 		if(ire_structure->quality > 0)	{
-			if(search->cur_motif < 3) ire_structure->quality+=3;
+			if(search->cur_motif < 3) ire_structure->quality+=2;
 			printf("%s\n", ire_structure->sequence);
-			printf("%s\t[ %u ]\n", ire_structure->structure,ire_structure->quality);
+			printf("%s\t[ %0.2f ]\n", ire_structure->structure,ire_structure->quality);
 		}
 
 		/* Free resources */
@@ -310,22 +282,33 @@ search_for_ire(SearchInfo *search, Regex *regex)
 
 
 static void
-compare_rnafold(IreFold *ire_structure)
+compare_rnafold(IreStructure *ire_structure)
 {
-	char *sequence = ire_structure->sequence;
+	const char *sequence = ire_structure->sequence;
 	char *structure = s_malloc(sizeof(char) * strlen(sequence) + 1);
 
 	/* Get the fold compound from sequence */
 	vrna_fold_compound_t *fc = vrna_fold_compound(sequence, NULL, VRNA_OPTION_DEFAULT);
+	float best_mfe = vrna_mfe(fc, NULL);
 
 	/* Add structure constraints to fold */
-	const char *cstruct = "......|x|....xxxxxx.............";
-	vrna_constraints_add(fc, cstruct, VRNA_CONSTRAINT_DB_DEFAULT);
+	// const char *cstruct = ".......x.....xxxxxx.............";
+	vrna_constraints_add(fc, ire_structure->structure, VRNA_CONSTRAINT_DB_DEFAULT);
 
 	/* Predict the minimum free energy & structure */
 	float mfe = vrna_mfe(fc, structure);
 
-	printf("%s\n%s [ %6.2f ]\n", sequence, structure, mfe);
+	/* Update quality score based on mfe */
+	float mfe_percent_change = (fabsf(mfe) - fabsf(best_mfe)) / fabsf(best_mfe);
+	if(mfe < 0) {
+		ire_structure->quality += 2*(1 - mfe_percent_change);
+	}
+
+	/* Update quality score based on structure similarities */
+	ire_structure->quality += 1 - (double)levenshtein(ire_structure->structure, structure)/32;
+
+	/* Compare upper stem in ire_fold and vrna structures */
+	ire_structure->quality += compare_structures(ire_structure->structure, structure);
 
 	/* Cleanup */
 	free(structure);
@@ -333,208 +316,42 @@ compare_rnafold(IreFold *ire_structure)
 }
 
 
-static IreFold *
-calculate_ire_structure(char *sequence)
+static float
+compare_structures(const char *struct_iref, const char *struct_vrna)
 {
-	IreFold *ire = s_malloc(sizeof *ire);
-	ire->paired = false;
-	ire->no_pair = 0;
-	ire->lower_pairs = 0;
-	ire->first_pair = 11;
-	ire->second_pair = 18;
-	ire->mismatch_pair = 0;
-	ire->is_valid = true;
-	ire->sequence = sequence;
-	ire->structure = strdup("......");
-
-	/* Sequence is not a valid IRE, too small :( */
-	if(strlen(sequence) != 31) {
-		ire->is_valid = false;
-		return ire;
+	float score = 0;
+	bool  cur_test = true;
+	for(int cbulge=6; cbulge<9; cbulge++) {
+		if(struct_iref[cbulge] != struct_vrna[cbulge]) cur_test = false;
+	}
+	if(cur_test) {
+		score += 0.5f;
 	}
 
-	/* Loops through all first_pair nucleotides going downstream */
-	for(; 4<ire->first_pair && ire->second_pair<25; ire->first_pair-=1) {
-			
-		ire->lower_pairs=0;
-		ire->paired=false;
-		if(ire->first_pair == 6) { // Skips the C bulge in upper stem
-			prepend(&ire->structure, ".");
-			continue;
+	cur_test = true;
+	for(int pair=13; pair<19; pair++) {
+		if(struct_iref[pair] != struct_vrna[pair]) cur_test = false;
+	}
+	if(cur_test) {
+		score += 0.25f;
+	}
+
+	cur_test = true;
+	int left=12, right=19, count=0;
+	while(count < 5) {
+		if(struct_iref[left] != struct_vrna[left] || struct_iref[right] != struct_vrna[right]) {
+			cur_test = false;
 		}
-			
-		/* Used to compare first_pair with second_pair */
-		while( ire->no_pair < 2 && !ire->paired ) {
-			determine_UTRpair(ire);
-			ire->second_pair+=1;
-		}
-
-		/* If the pairs do not match IRE pair constraints, then discard */
-		if(!follow_constraints(ire->no_pair, ire->mismatch_pair)) {
-			ire->is_valid = false;
-			return ire;
-		}
+		left--;
+		right++;
+		count++;
+	}
+	if(cur_test) {
+		score += 0.25f;
 	}
 
-	/* Check for pairs in the lower stem */
-	while(ire->first_pair >= 0 && ire->second_pair < 31) {
-		ire->paired = true;
-		uint unp = 0;
-
-		/* Used to compare first_pair with second_pair */
-		while(ire->paired) {
-			lowerstem_UTRpair(ire, unp);
-			ire->second_pair++;
-			unp++;
-		}
-		ire->first_pair--;
-	}
-
-	for(; ire->second_pair<31; ire->second_pair+=1) {
-		append(&ire->structure, ".");
-	}
-	for(; ire->first_pair>=0; ire->first_pair--) {
-		prepend(&ire->structure, ".");
-	}
-
-	if(ire->lower_pairs < 5) {
-		ire->is_valid = false;
-	}
-
-	return ire;
+	return score;
 }
-
-
-static uint
-check_pair(const char first_nucleotide, const char second_nucleotide)
-{
-	/* Define a mapping between nucleotide pairs and return values */
-    const char         *pairs = "GC CG AT TA AU UA TG GT UG GU";
-    const int return_values[] = {1, 1, 1, 1, 1, 1, 2, 2, 2, 2};
-    
-    /* Iterate over pairs and compare with the input nucleotides */
-    for (int i = 0; i < 10; ++i) {
-        if (pairs[i * 3] == first_nucleotide && pairs[i * 3 + 1] == second_nucleotide) {
-            return return_values[i];
-        }
-    }
-    
-    return 0; /* If the pair is not found, return 0 */
-}
-
-
-static void // Determines if the given pair (i.e., GC) is a valid pair
-determine_UTRpair(IreFold *ire)
-{
-	const char first_nucleotide = ire->sequence[ire->first_pair];
-	const char second_nucleotide = ire->sequence[ire->second_pair];
-
-	const uint pair_type = check_pair(first_nucleotide, second_nucleotide);
-	if(pair_type == 1) {
-		ire->paired = true;
-		append(&ire->structure, ")");
-		prepend(&ire->structure, "(");
-
-		if(ire->first_pair == 5) {
-			ire->lower_pairs += 1;
-		}
-
-	} else if(pair_type == 2) {
-		ire->paired = true;
-		ire->mismatch_pair += 1;
-		append(&ire->structure, "}");
-		prepend(&ire->structure, "{");
-
-		if(ire->first_pair == 5) {
-			ire->lower_pairs+=1;
-		}
-
-	} else {
-		if( 19 <= ire->second_pair && ire->second_pair <= 23) {
-			ire->no_pair += 1;
-			append(&ire->structure, ".");
-		} else {
-			ire->no_pair = 2;
-		}
-	}
-}
-
-
-/* Determines if the pair in the lower stem is a valid pair */
-static void
-lowerstem_UTRpair(IreFold *ire, const uint unpaired_count)
-{
-	char first_nucleotide;
-	char second_nucleotide;
-
-	if(ire->first_pair >= 0) { first_nucleotide = ire->sequence[ire->first_pair]; }
-	else { first_nucleotide = 'X'; }
-
-	if(ire->second_pair < 31) { second_nucleotide = ire->sequence[ire->second_pair]; }
-	else { second_nucleotide = 'X'; }
-
-
-	const uint pair_type = check_pair(first_nucleotide, second_nucleotide);
-
-	if(pair_type == 1) {
-		if(unpaired_count==1) {
-			prepend(&ire->structure, "(");
-			append(&ire->structure, ".)");
-			ire->paired = false;
-			ire->lower_pairs += 1;
-		} else if(unpaired_count==2) {
-			prepend(&ire->structure, "(");
-			append(&ire->structure, "..)");
-			ire->paired = false;
-			ire->lower_pairs += 1;
-		} else {
-			prepend(&ire->structure, "(");
-			append(&ire->structure, ")");
-			ire->paired = false;
-			ire->lower_pairs += 1;
-		}
-	} else if(pair_type == 2) {
-		if(unpaired_count==1) {
-			prepend(&ire->structure, "{");
-			append(&ire->structure, ".}");
-			ire->paired = false;
-			ire->lower_pairs += 1;
-		} else if(unpaired_count==2) {
-			prepend(&ire->structure, "{");
-			append(&ire->structure, "..}");
-			ire->paired = false;
-			ire->lower_pairs += 1;
-		} else {
-			prepend(&ire->structure, "{");
-			append(&ire->structure, "}");
-			ire->paired = false;
-			ire->lower_pairs += 1;
-		}
-	} else {
-		if(unpaired_count > 1) {
-			prepend(&ire->structure, ".");
-			ire->paired = false;
-			ire->second_pair -= 3;
-		}
-	}
-}
-
-/* Determines if the pairs that were determined follow IRE contraints */
-static bool
-follow_constraints(uint no_pair, uint mismatch_pair)
-{
-	if(no_pair==2) {
-		return false;
-	}
-	if(mismatch_pair>2) {
-		return false;
-	}
-	if(no_pair > 0 && mismatch_pair > 0) {
-		return false;
-	}
-	return true;
-}
-
 
 /*==================== Helper functions ====================*/
 static int
