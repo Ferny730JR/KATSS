@@ -29,13 +29,6 @@ typedef struct SearchInfo {
 } SearchInfo;
 
 
-typedef struct RecordData {
-	char    *sequence;
-	char    *header;
-	Regex   *regex;
-} RecordData;
-
-
 typedef struct Options {
 	char    *input_file;
 	FILE    *out_file;
@@ -54,6 +47,14 @@ typedef struct Options {
 	int      jobs;
 } Options;
 
+
+typedef struct RecordData {
+	char    *sequence;
+	char    *header;
+	Regex   *regex;
+	Options *opt;
+} RecordData;
+
 /*==================== Function Declarations ====================*/
 void    process_sequence(RecordData *record);
 static Matcher search_for_ire(SearchInfo *search, Regex *regex);
@@ -62,9 +63,10 @@ static float   compare_structures(const char *struct_iref, const char *struct_vr
 
 static int     get_num_threads(struct aspiire_args_info args_info);
 static Regex  *init_regex(void);
-RecordData    *copy_record_data(RnaInfo rna_info, Regex *regex);
+RecordData    *copy_record_data(RnaInfo rna_info, Regex *regex, Options *opt);
 static char    delimiter_to_char(char *user_delimiter);
 static void    free_options(Options *opt);
+static const char *get_contraints(const char *predicted);
 
 
 void
@@ -194,7 +196,7 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		RUN_IN_PARALLEL(process_sequence, copy_record_data(info, regex));
+		RUN_IN_PARALLEL(process_sequence, copy_record_data(info, regex, &opt));
 	}
 	rnaf_close(read_file);
 	UNINIT_PARALLELIZATION
@@ -209,13 +211,15 @@ main(int argc, char *argv[])
 void
 process_sequence(RecordData *record)
 {
-	SearchInfo *search = s_malloc(sizeof *search);
-	search->sequence = record->sequence;
+	SearchInfo *search      = s_malloc(sizeof *search);
+	search->sequence        = record->sequence;
 	search->sequence_length = strlen(record->sequence);
-	search->search_index = 0;
-	search->cur_motif = 0;
+	search->search_index    = 0;
+	search->cur_motif       = 0;
 
-	bool header_shown = false;
+	Options *opt          = record->opt;
+	char    *output       = NULL;
+	bool     header_shown = false;
 
 	do {
 		Matcher matcher = search_for_ire(search, record->regex);
@@ -232,24 +236,28 @@ process_sequence(RecordData *record)
 			continue;
 		}
 		char *ire_sequence = substr(record->sequence, ire_start, 32);
+		clean_seq(ire_sequence, true);
 
 		/* Calculate the structure of the IRE motif */
 		IreStructure *ire_structure = predict_ire(ire_sequence);
 
 		if(ire_structure->quality > 0) {
 			compare_rnafold(ire_structure);
+			if(search->cur_motif < 3) ire_structure->quality+=2;
 		}
 
 		/* Show header if IRE is found */
 		if(ire_structure->quality > 0 && !header_shown && record->header) {
-			printf("%s",record->header);
+			output = strdup(record->header);
 			header_shown = true;
 		}
 
+		/* Store current IRE if above threshold */
 		if(ire_structure->quality > 0)	{
-			if(search->cur_motif < 3) ire_structure->quality+=2;
-			printf("%s\n", ire_structure->sequence);
-			printf("%s\t[ %0.2f ]\n", ire_structure->structure,ire_structure->quality);
+			char out[50] = {0};
+			sprintf(out,"\n%s\t[ %0.2f ]\n",ire_structure->structure,ire_structure->quality);
+			append(&output, ire_structure->sequence);
+			append(&output, out);
 		}
 
 		/* Free resources */
@@ -259,11 +267,17 @@ process_sequence(RecordData *record)
 		search->search_index += matcher.foundAtIndex + matcher.matchLength;
 	} while(search->cur_motif < 18); // since there are only 18 motifs
 
+	/* Output collected*/
+	if(output) {
+		THREADSAFE_STREAM_OUTPUT(fprintf(opt->out_file, "%s", output))
+	}
+
 	/* free stuff */
 	free(record->sequence);
 	if(record->header) free(record->header);
 	free(record);
 	free(search);
+	free(output);
 }
 
 
@@ -289,11 +303,11 @@ compare_rnafold(IreStructure *ire_structure)
 
 	/* Get the fold compound from sequence */
 	vrna_fold_compound_t *fc = vrna_fold_compound(sequence, NULL, VRNA_OPTION_DEFAULT);
-	float best_mfe = vrna_mfe(fc, NULL);
+	float best_mfe = vrna_mfe(fc, structure);
 
 	/* Add structure constraints to fold */
-	// const char *cstruct = ".......x.....xxxxxx.............";
-	vrna_constraints_add(fc, ire_structure->structure, VRNA_CONSTRAINT_DB_DEFAULT);
+	const char *constraint = get_contraints((const char *)ire_structure->structure);
+	vrna_constraints_add(fc, constraint, VRNA_CONSTRAINT_DB_DEFAULT);
 
 	/* Predict the minimum free energy & structure */
 	float mfe = vrna_mfe(fc, structure);
@@ -301,16 +315,17 @@ compare_rnafold(IreStructure *ire_structure)
 	/* Update quality score based on mfe */
 	float mfe_percent_change = fabsf(mfe - best_mfe) / fabsf((mfe + best_mfe)/2);
 	if(mfe < 0) {
-		ire_structure->quality += 2*(1 - mfe_percent_change);
+		ire_structure->quality += 1.5F*(1.0F - mfe_percent_change);
 	}
 
 	/* Update quality score based on structure similarities */
-	ire_structure->quality += 1 - (double)levenshtein(ire_structure->structure, structure)/32;
+	ire_structure->quality += 1.5F - (float)levenshtein(ire_structure->structure, structure)/32.0F;
 
 	/* Compare upper stem in ire_fold and vrna structures */
-	ire_structure->quality += compare_structures(ire_structure->structure, structure);
+	ire_structure->quality += 2.5F * compare_structures(ire_structure->structure, structure);
 
 	/* Cleanup */
+	free((char *)constraint);
 	free(structure);
 	vrna_fold_compound_free(fc);
 }
@@ -382,7 +397,7 @@ get_num_threads(struct aspiire_args_info args_info)
 static Regex *
 init_regex(void)
 {
-	const char *canonical_motif_1 = "C.....CAG[TG]G[CUTAG]";
+	const char *canonical_motif_1 = "C.....CAG[TUG]G[CUTAG]";
 	const char *canonical_motif_2 = "C.....CAGAG[CATU]";
 	const char *selex_motif_1 =     "C.....C[TU]G[TU]G[TUC]";
 	const char *selex_motif_2 =     "C.....CCG[TU]G[ATUC]";
@@ -426,14 +441,28 @@ init_regex(void)
 
 
 RecordData *
-copy_record_data(RnaInfo rna_info, Regex *regex) {
+copy_record_data(RnaInfo rna_info, Regex *regex, Options *opt) {
     RecordData *new_data = s_malloc(sizeof *new_data);
 	
 	new_data->sequence      = rna_info.sequence;
 	new_data->header        = rna_info.header;
     new_data->regex         = regex;
+	new_data->opt           = opt;
 
     return new_data;
+}
+
+
+static const char *
+get_contraints(const char *predicted)
+{
+	char *constraint = strdup(predicted);
+	constraint[7] = 'x';
+	for(int i=13; i<19; i++) {
+		constraint[i] = 'x';
+	}
+
+	return (const char *)constraint;
 }
 
 
