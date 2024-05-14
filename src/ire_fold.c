@@ -26,7 +26,7 @@ IreStructure *
 predict_ire(const char *sequence)
 {
 	IreStructure *ire_structure = irestruct_init(sequence);
-	if(strlen(sequence) != 32 || !worth_testing(sequence)) {
+	if(!worth_testing(sequence)) {
 		ire_structure->quality = 0;
 		return ire_structure;
 	}
@@ -56,7 +56,7 @@ irestruct_destroy(IreStructure *ire_structure)
 static inline uint
 predict_ire_h(IreStructure *ire, int left, int right)
 {
-	if(left < 0 || right >= 32) {
+	if(left < 0 || right >= ire->__seqlen) {
 		uint score=score_structure(ire->sequence,(const char *)ire->__struct);
 		if(score >= ire->__bestscore) {
 			strcpy(ire->structure, ire->__struct);
@@ -167,6 +167,7 @@ irestruct_init(const char *sequence)
 	ire_struct->structure = s_calloc(strlen(sequence) + 1, sizeof(char));
 	ire_struct->__struct  = s_calloc(strlen(sequence) + 1, sizeof(char));
 	ire_struct->__bestscore = 0;
+	ire_struct->__seqlen    = (int)strlen(sequence);
 	for(int i=0; i<(int)strlen(sequence); i++) {
 		ire_struct->structure[i] = '.';
 		ire_struct->__struct[i]  = '.';
