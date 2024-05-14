@@ -31,7 +31,7 @@ predict_ire(const char *sequence)
 		return ire_structure;
 	}
 
-	uint weight = predict_ire_h(ire_structure, 12, 19);
+	float weight = predict_ire_h(ire_structure, 12, 19);
 	if(weight != 0) {
 		for(int i=0; i<13; i++) {
 			if(ire_structure->structure[i] == '(') weight--;
