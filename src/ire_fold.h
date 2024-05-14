@@ -9,7 +9,7 @@ typedef struct IreStructure {
 	float       quality;     /* Quality score of the predicted structure */
 
 	char       *__struct;    /* Stores structure that is being processed */
-	uint        __bestscore; /* Current best score in the preediction */
+	float       __bestscore; /* Current best score in the preediction */
 	int         __seqlen;    /* Length of the IRE sequence */
 } IreStructure;
 

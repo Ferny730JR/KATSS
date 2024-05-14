@@ -13,9 +13,9 @@ void irestruct_destroy(IreStructure *ire_structure);
 static IreStructure *irestruct_init(const char *sequence);
 static bool worth_testing(const char *sequence);
 static inline uint worth_testing_h(const char *sequence, int left, int right);
-static inline uint predict_ire_h(IreStructure *ire_structure, int left, int right);
-static inline uint get_max(IreStructure *ire, int left, int right);
-static inline uint score_structure(const char *sequence, const char *structure);
+static inline float predict_ire_h(IreStructure *ire_structure, int left, int right);
+static inline float get_max(IreStructure *ire, int left, int right);
+static inline float score_structure(const char *sequence, const char *structure);
 static inline uint pair_is_gu(const char *sequence, int left, int right);
 static inline uint check_pair(const char first_nucleotide, const char second_nucleotide);
 static inline uint max3(uint a, uint b, uint c);
@@ -53,11 +53,11 @@ irestruct_destroy(IreStructure *ire_structure)
 
 
 /*========================= IRE Prediction Algorithm =========================*/
-static inline uint
+static inline float
 predict_ire_h(IreStructure *ire, int left, int right)
 {
 	if(left < 0 || right >= ire->__seqlen) {
-		uint score=score_structure(ire->sequence,(const char *)ire->__struct);
+		float score=score_structure(ire->sequence,(const char *)ire->__struct);
 		if(score >= ire->__bestscore) {
 			strcpy(ire->structure, ire->__struct);
 			ire->__bestscore = score;
@@ -69,17 +69,18 @@ predict_ire_h(IreStructure *ire, int left, int right)
 }
 
 
-static inline uint
+static inline float
 get_max(IreStructure *ire, int left, int right)
 {
-	uint score = check_pair(ire->sequence[left], ire->sequence[right]);
+	uint pair_type = check_pair(ire->sequence[left], ire->sequence[right]);
+	float score;
 
-	if(score == 1) {
+	if(pair_type == 1) {
 		ire->__struct[left] = '('; ire->__struct[right] = ')';
 		score = predict_ire_h(ire, left-(1+(left==8)),right+1);
 		ire->__struct[left] = '.'; ire->__struct[right] = '.';
 
-	} else if(score == 2) {
+	} else if(pair_type == 2) {
 		uint rscore = predict_ire_h(ire, left, right+1);
 		uint lscore = predict_ire_h(ire, left-(1+(left==8)), right);
 		ire->__struct[left] = '('; ire->__struct[right] = ')';
@@ -100,10 +101,10 @@ get_max(IreStructure *ire, int left, int right)
 }
 
 
-static inline uint
+static inline float
 score_structure(const char *sequence, const char *structure)
 {
-	uint score = 4;
+	float score = 2.5f;
 	uint num_upper_pairs = 0;
 	uint num_lower_pairs = 0;
 	uint num_upper_bulge = 0;
@@ -150,9 +151,9 @@ score_structure(const char *sequence, const char *structure)
 	if((num_gu > 2) || (mismatch > 1) || (num_upper_bulge > 1)) {
 		return 0;
 	}
-	score -= num_gu;
-	score -= num_upper_bulge;
-	score -= mismatch;
+	score -= 0.25F*num_gu;
+	score -= 0.5F*num_upper_bulge;
+	score -= (float)mismatch;
 
 	return score;
 }
