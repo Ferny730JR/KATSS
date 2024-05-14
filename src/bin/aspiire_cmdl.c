@@ -44,7 +44,7 @@ const char *aspiire_args_info_detailed_help[] = {
   "  Specify the default name for the output file. If this option is not used, the\n  default name is \"motif.dsv\".\n",
   "  -k, --kmer=INT             Set the length of k-mers.\n                                 (default=`30')",
   "  Specify the length of the k-mers you want to search IREs for.\n",
-  "  -t, --threshold=INT        Specify the minimum percent match that predicted\n                               structure should match RNAfold structure.\n                                 (default=`78')",
+  "  -t, --threshold=FLOAT      Specify the minimum percent match that predicted\n                               structure should match RNAfold structure.\n                                 (default=`0.01')",
   "  The program uses the ViennaRNA package to get the predicted structure of a\n  matched RNA. This predicted structure is then compared with the predicted IRE\n  structure of the matched sequence, to determine the accuracy of the IRE\n  structure.\n",
   "      --format=STRING        Specify the format of the input file.\n                                 (default=`seq')",
   "  format options:\n  \t`seq',`transcript_id', `gene_id', `gene_name', `strand', `chr', `range'\n\n  \tSet format to the variables in your file, in the order they are listed as\n  \ta comma separated list\n  \tFor example, assuming you had a file as such\n\n  \t  $ cat UTR.txt\n  \t  >UTR.txt\n  \t  ENST00000001146 ENSG00000003137 - 2 72147835-72147852 ACAGCCAATCCCCCGAG\n\n  \tThen you would set the format option to:\n  \t--format=\"transcript_id,gene_id,strand,chr,range,seq\"\n\n  \tIf you instead had the following file:\n\n  \t  $ cat UTR.fa\n  \t  >UTR.fa\n  \t  ACAGCCAATCCCCCGAG\n\n  \tThen you would set the format option as such: --format=\"seq\"\n",
@@ -81,6 +81,7 @@ typedef enum {ARG_NO
   , ARG_FLAG
   , ARG_STRING
   , ARG_INT
+  , ARG_FLOAT
 } aspiire_cmdline_parser_arg_type;
 
 static
@@ -122,7 +123,7 @@ void clear_args (struct aspiire_args_info *args_info)
   args_info->output_orig = NULL;
   args_info->kmer_arg = 30;
   args_info->kmer_orig = NULL;
-  args_info->threshold_arg = 78;
+  args_info->threshold_arg = 0.01;
   args_info->threshold_orig = NULL;
   args_info->format_arg = gengetopt_strdup ("seq");
   args_info->format_orig = NULL;
@@ -1083,6 +1084,9 @@ int update_arg(void *field, char **orig_field,
   case ARG_INT:
     if (val) *((int *)field) = strtol (val, &stop_char, 0);
     break;
+  case ARG_FLOAT:
+    if (val) *((float *)field) = (float)strtod (val, &stop_char);
+    break;
   case ARG_STRING:
     if (val) {
       string_field = (char **)field;
@@ -1098,6 +1102,7 @@ int update_arg(void *field, char **orig_field,
   /* check numeric conversion */
   switch(arg_type) {
   case ARG_INT:
+  case ARG_FLOAT:
     if (val && !(stop_char && *stop_char == '\0')) {
       fprintf(stderr, "%s: invalid numeric value: %s\n", package_name, val);
       return 1; /* failure */
@@ -1261,7 +1266,7 @@ aspiire_cmdline_parser_internal (
         
           if (update_arg( (void *)&(args_info->threshold_arg), 
                &(args_info->threshold_orig), &(args_info->threshold_given),
-              &(local_args_info.threshold_given), optarg, 0, "78", ARG_INT,
+              &(local_args_info.threshold_given), optarg, 0, "0.01", ARG_FLOAT,
               check_ambiguity, override, 0, 0,
               "threshold", 't',
               additional_error))

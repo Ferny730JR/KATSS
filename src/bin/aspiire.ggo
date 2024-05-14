@@ -45,8 +45,8 @@ option "threshold" t
 details="The program uses the ViennaRNA package to get the predicted structure of a matched RNA.\
  This predicted structure is then compared with the predicted IRE structure of the matched\
  sequence, to determine the accuracy of the IRE structure.\n"
-int
-default="78"
+float
+default="0.01"
 optional
 
 option "format" -

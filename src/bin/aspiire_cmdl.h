@@ -58,8 +58,8 @@ struct aspiire_args_info
  original value given at command line.  */
   const char *kmer_help; /**< @brief Set the length of k-mers.
  help description.  */
-  int threshold_arg;	/**< @brief Specify the minimum percent match that predicted structure should match RNAfold structure.
- (default='78').  */
+  float threshold_arg;	/**< @brief Specify the minimum percent match that predicted structure should match RNAfold structure.
+ (default='0.01').  */
   char * threshold_orig;	/**< @brief Specify the minimum percent match that predicted structure should match RNAfold structure.
  original value given at command line.  */
   const char *threshold_help; /**< @brief Specify the minimum percent match that predicted structure should match RNAfold structure.
