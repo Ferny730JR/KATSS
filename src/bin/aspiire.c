@@ -37,7 +37,7 @@ typedef struct Options {
 
 	int      kmer;
 	char     out_delimiter;
-	int      threshold;
+	float      threshold;
 
 	char    *format;
 	bool     format_given;
@@ -79,7 +79,7 @@ init_deafult_options(Options *opt)
 
 	opt->kmer           = 30;
 	opt->out_delimiter  = '\t';
-	opt->threshold      = 78;
+	opt->threshold      = 0.01F;
 
 	opt->format         = "seq";
 	opt->format_given   = false;
@@ -139,14 +139,14 @@ main(int argc, char *argv[])
 	}
 
 	if(args_info.threshold_given) {
-		if(args_info.threshold_arg < 0) {
-			error_message("option '--threshold=%d' must be a value greater than 0.",args_info.threshold_arg);
+		if(args_info.threshold_arg < 0.0F) {
+			error_message("option '--threshold=%0.2f' must be a value greater than 0.",args_info.threshold_arg);
 			aspiire_cmdline_parser_free(&args_info);
 			free_options(&opt);
 			exit(EXIT_FAILURE);
 		}
-		if(args_info.threshold_given > 100) {
-			error_message("option '--threshold=%d' must be a value less than 100.",args_info.threshold_arg);
+		if(args_info.threshold_given > 10.0F) {
+			error_message("option '--threshold=%0.2f' must be a value less than 10.",args_info.threshold_arg);
 			aspiire_cmdline_parser_free(&args_info);
 			free_options(&opt);
 			exit(EXIT_FAILURE);
@@ -219,7 +219,6 @@ process_sequence(RecordData *record)
 
 	Options *opt          = record->opt;
 	char    *output       = NULL;
-	bool     header_shown = false;
 
 	do {
 		Matcher matcher = search_for_ire(search, record->regex);
@@ -246,18 +245,13 @@ process_sequence(RecordData *record)
 			if(search->cur_motif < 3) ire_structure->quality+=2;
 		}
 
-		/* Show header if IRE is found */
-		if(ire_structure->quality > 0 && !header_shown && record->header) {
-			output = strdup(record->header);
-			header_shown = true;
-		}
-
 		/* Store current IRE if above threshold */
-		if(ire_structure->quality > 0)	{
-			char out[50] = {0};
-			sprintf(out,"\n%s\t[ %0.2f ]\n",ire_structure->structure,ire_structure->quality);
-			append(&output, ire_structure->sequence);
-			append(&output, out);
+		if(ire_structure->quality > opt->threshold)	{
+			char cur[512] = {0};
+			sprintf(cur,"%s\t%d-%d\n",ire_sequence, ire_start+1, ire_start+1+32);
+			append(&output, cur);
+			sprintf(cur,"%s\t[ %0.2f ]\n",ire_structure->structure,ire_structure->quality);
+			append(&output, cur);
 		}
 
 		/* Free resources */
@@ -269,6 +263,7 @@ process_sequence(RecordData *record)
 
 	/* Output collected*/
 	if(output) {
+		prepend(&output, record->header);
 		THREADSAFE_STREAM_OUTPUT(fprintf(opt->out_file, "%s", output))
 	}
 
