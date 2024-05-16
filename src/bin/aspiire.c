@@ -74,7 +74,7 @@ init_deafult_options(Options *opt)
 {
 	opt->input_file     = NULL;
 	opt->out_file       = NULL;
-	opt->out_filename   = "motif";
+	opt->out_filename   = "ire";
 	opt->out_given      = false;
 
 	opt->kmer           = 30;
@@ -165,7 +165,7 @@ main(int argc, char *argv[])
 
 	opt.jobs = get_num_threads(args_info);
 
-	char *filename = concat(opt.out_filename, ".dsv");
+	char *filename = concat(opt.out_filename, ".fa");
 	opt.out_file = fopen(filename, "w");
 	if (opt.out_file == NULL) {
 		error_message("Could not write to file '%s'\n",filename);
