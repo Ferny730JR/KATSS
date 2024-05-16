@@ -70,6 +70,10 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # bppPipeline compiler options
     target_compile_options(bppPipeline PRIVATE -g -Wall -O3 -lm)
     target_link_options(bppPipeline PRIVATE -g -Wall -flto -fopenmp -O3 -lm -lstdc++)
+
+	# aspiire compiler options
+	target_compile_options(aspiire PRIVATE -Wall -Wextra -O3)
+    target_link_options(aspiire PRIVATE -Wall -Wextra -flto -fopenmp -O3 -lm -lstdc++)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin") # Apple
     target_compile_options(SKA PRIVATE -g -Wall -Wextra -Wpedantic -flto -O3)
     target_compile_options(bppPipeline PRIVATE -g -Wall -flto -O3)
