@@ -11,24 +11,24 @@ find_package(ZLIB REQUIRED)
 
 # Build bppPipeline
 add_executable(bppPipeline
-    src/bin/bppPipeline.c
-    src/bin/bppPipeline_cmdl.c
-    src/rna_file_parser.c
-    src/kmerHashTable.c
-    src/string_utils.c
-    src/utils.c
-    src/parallel_helpers.c
-    src/c_thread_pool/thpool.c)
+	src/bin/bppPipeline.c
+	src/bin/bppPipeline_cmdl.c
+	src/rna_file_parser.c
+	src/kmerHashTable.c
+	src/string_utils.c
+	src/utils.c
+	src/parallel_helpers.c
+	src/c_thread_pool/thpool.c)
 
 # Build SKA
 add_executable(SKA
-    src/bin/SKA.c
+	src/bin/SKA.c
 	src/bin/SKA_cmdl.c
-    src/rna_file_parser.c
+	src/rna_file_parser.c
 	src/kmer_counter.c
-    src/kmerHashTable.c
-    src/string_utils.c
-    src/utils.c
+	src/kmerHashTable.c
+	src/string_utils.c
+	src/utils.c
 	src/Regex.c)
 
 # Build aspiire
@@ -52,8 +52,8 @@ target_link_libraries(SKA ZLIB::ZLIB)
 target_include_directories(bppPipeline PRIVATE src/c_thread_pool)
 target_include_directories(bppPipeline PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
 find_path(VIENNARNA_INCLUDE_DIRS 
-    NAMES ViennaRNA/fold.h
-    PATHS $ENV{HOME}/.local/include /usr/local/include)
+	NAMES ViennaRNA/fold.h
+	PATHS $ENV{HOME}/.local/include /usr/local/include)
 target_include_directories(bppPipeline PRIVATE ${VIENNARNA_INCLUDE_DIRS})
 
 # Include directories for aspiire
@@ -63,39 +63,39 @@ target_include_directories(aspiire PRIVATE ${VIENNARNA_INCLUDE_DIRS})
 
 # Specify compiler options based on OS
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    # SKA compiler options
-    target_compile_options(SKA PRIVATE -g -Wall -O3 -lm)
-    target_link_options(SKA PRIVATE -g -Wall -O3 -flto -fopenmp -lm)
+	# SKA compiler options
+	target_compile_options(SKA PRIVATE -g -Wall -O3 -lm)
+	target_link_options(SKA PRIVATE -g -Wall -O3 -flto -fopenmp -lm)
 
-    # bppPipeline compiler options
-    target_compile_options(bppPipeline PRIVATE -g -Wall -O3 -lm)
-    target_link_options(bppPipeline PRIVATE -g -Wall -flto -fopenmp -O3 -lm -lstdc++)
+	# bppPipeline compiler options
+	target_compile_options(bppPipeline PRIVATE -g -Wall -O3 -lm)
+	target_link_options(bppPipeline PRIVATE -g -Wall -flto -fopenmp -O3 -lm -lstdc++)
 
 	# aspiire compiler options
 	target_compile_options(aspiire PRIVATE -Wall -Wextra -O3)
-    target_link_options(aspiire PRIVATE -Wall -Wextra -flto -fopenmp -O3 -lm -lstdc++)
+	target_link_options(aspiire PRIVATE -Wall -Wextra -flto -fopenmp -O3 -lm -lstdc++)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin") # Apple
-    target_compile_options(SKA PRIVATE -g -Wall -Wextra -Wpedantic -flto -O3)
-    target_compile_options(bppPipeline PRIVATE -g -Wall -flto -O3)
+	target_compile_options(SKA PRIVATE -g -Wall -Wextra -Wpedantic -flto -O3)
+	target_compile_options(bppPipeline PRIVATE -g -Wall -flto -O3)
 	target_compile_options(aspiire PRIVATE -Wall -Wextra -flto -O3)
 else()
-    message( SEND_ERROR "System ${CMAKE_SYSTEM_NAME} currently not supported.")
+	message( SEND_ERROR "System ${CMAKE_SYSTEM_NAME} currently not supported.")
 endif()
 
 # Link bppPipeline & aspiire with libraries
 find_library(LIBRARY_LRNA 
-    NAMES RNA
-    HINTS "$ENV{HOME}/.local/lib")
+	NAMES RNA
+	HINTS "$ENV{HOME}/.local/lib")
 if(LIBRARY_LRNA)
-    target_link_libraries(bppPipeline PUBLIC ${LIBRARY_LRNA} ZLIB::ZLIB)
+	target_link_libraries(bppPipeline PUBLIC ${LIBRARY_LRNA} ZLIB::ZLIB)
 	target_link_libraries(aspiire PUBLIC ${LIBRARY_LRNA} ZLIB::ZLIB)
 else()
-    message( SEND_ERROR "Couldn't find libRNA")
+	message( SEND_ERROR "Couldn't find libRNA")
 endif()
 
 # Install files
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set(CMAKE_INSTALL_PREFIX /usr/local/bin)
+	set(CMAKE_INSTALL_PREFIX /usr/local/bin)
 endif()
 
 install(TARGETS SKA bppPipeline
