@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "kmer_counter.h"
 #include "string_utils.h"
@@ -105,16 +106,26 @@ kctr_fincrement(KmerCounter *kcounter, const char *sequence)
 {
 	int sequence_length = strlen(sequence);
 	int k = kcounter->k_mer;
+	int start = 0;
 	unsigned int word_mask = (1 << 2*k) - 1;
 
 	if(sequence_length < k) { return; }
 
 	unsigned int hash_value = kctr_hash(sequence, 0, k);
+	while(hash_value == UINT_MAX) {
+		if(start < sequence_length-k+1) {
+			start++;
+			hash_value = (unsigned int)kctr_hash(sequence, start, k);
+		} else {
+			return;
+		}
+	}
 	kcounter->entries[hash_value]++;
 	kcounter->total_count++;
 
 	for (int i = k; i < sequence_length; i++) {
 		unsigned int x = kcounter->nucleotide_to_number[(unsigned char)sequence[i]];
+		if(x == UINT_MAX) { return; }
 		hash_value = ((hash_value << 2) | x) & word_mask;
 
 		kcounter->entries[hash_value]++;
@@ -215,7 +226,7 @@ initialize_mapping(KmerCounter *kcounter)
 {
 	// Initialize all elements to 0
 	for (int i = 0; i < 256; i++) {
-		kcounter->nucleotide_to_number[i] = (unsigned int)0;
+		kcounter->nucleotide_to_number[i] = UINT_MAX;
 	}
 
 	// Assign values for nucleotides
