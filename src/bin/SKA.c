@@ -317,6 +317,14 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
+	if(args_info.iterations_given && args_info.enrichments_given) {
+		error_message("You cannot provide iterations when calculating enrichments!\n"
+		              "Disable either `--iterations=%d' or `--enrichments'", opt.iterations);
+		SKA_cmdline_parser_free(&args_info);
+		free_options(&opt);
+		exit(EXIT_FAILURE);
+	}
+
 	char *filename = concat(opt.out_filename, ".dsv");
 	opt.out_file = fopen(filename, "w");
 	if (opt.out_file == NULL) {
