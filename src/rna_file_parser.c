@@ -255,6 +255,9 @@ rnaf_rebuff(RNA_FILE *rna_file, unsigned int size)
 	rna_file->buffer_size = size;
 	gzrewind(rna_file->file);
 	memset(rna_file->buffer, 0, (size+1) * sizeof(char));
+	if(rna_file->filetype == 'a' || rna_file->filetype == 'q') {
+		gzgets(rna_file->file, rna_file->buffer, rna_file->buffer_size);
+	}
 }
 
 
