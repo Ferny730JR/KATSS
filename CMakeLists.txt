@@ -98,5 +98,5 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set(CMAKE_INSTALL_PREFIX /usr/local/bin)
 endif()
 
-install(TARGETS SKA bppPipeline
+install(TARGETS SKA bppPipeline aspiire
         DESTINATION ${CMAKE_INSTALL_PREFIX})
