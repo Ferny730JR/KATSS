@@ -1124,11 +1124,6 @@ free_options(options *opt)
 	if(opt->out_given) {
 		free(opt->out_filename);
 	}
-	for(int i=0; i<opt->iterations; i++) {
-		if(opt->top_kmer) {
-			free(opt->top_kmer[i]);
-		}
-	}
 	if(opt->motif) {
 		free(opt->motif);
 	}
