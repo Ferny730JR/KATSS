@@ -80,6 +80,8 @@ struct SKA_args_info
  (default=off).  */
   const char *no_log_help; /**< @brief Don't normalize enrichments to log2.
  help description.  */
+  int enrichments_flag;	/**< @brief Compute the regular enrichments. (default=off).  */
+  const char *enrichments_help; /**< @brief Compute the regular enrichments. help description.  */
   int independent_probs_flag;	/**< @brief Calculate the enrichments without the input reads.
  (default=off).  */
   const char *independent_probs_help; /**< @brief Calculate the enrichments without the input reads.
@@ -111,6 +113,7 @@ struct SKA_args_info
   unsigned int iterations_given ;	/**< @brief Whether iterations was given.  */
   unsigned int file_delimiter_given ;	/**< @brief Whether file-delimiter was given.  */
   unsigned int no_log_given ;	/**< @brief Whether no-log was given.  */
+  unsigned int enrichments_given ;	/**< @brief Whether enrichments was given.  */
   unsigned int independent_probs_given ;	/**< @brief Whether independent-probs was given.  */
   unsigned int fmotif_given ;	/**< @brief Whether fmotif was given.  */
   unsigned int motif_given ;	/**< @brief Whether motif was given.  */

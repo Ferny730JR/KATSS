@@ -54,6 +54,8 @@ const char *SKA_args_info_detailed_help[] = {
   "  The enrichment values produced by SKA are by default normalized to the\n  logarithm base 2. This is done to help visualize the proportional changes\n  between the target and the background data. By toggling this flag, you can\n  get the pure enrichment values rather than the normalized values.\n",
   "\nAlgorithms:",
   "  Select additional algorithms to determine the calculations.\n\n",
+  "  -R, --enrichments          Compute the regular enrichments.  (default=off)",
+  "  This algorithm calculates the R value from all k-mer frequencies in the given\n  files.\n",
   "  -p, --independent-probs    Calculate the enrichments without the input reads.\n                                 (default=off)",
   "  Using the dinucleotide and mononucleotide frequencies of the target data, SKA\n  can make an accurate prediction as to what the enrichment values should be.\n  As such, when computing the actual frequencies for all k-mers, the values\n  that deviate the most from the predictions are the most significant, and are\n  used to discover the motif.\n",
   "      --fmotif=string        Search for a specific fixed motif, rather than all\n                               k-mers.\n",
@@ -83,11 +85,12 @@ init_help_array(void)
   SKA_args_info_help[14] = SKA_args_info_detailed_help[21];
   SKA_args_info_help[15] = SKA_args_info_detailed_help[23];
   SKA_args_info_help[16] = SKA_args_info_detailed_help[25];
-  SKA_args_info_help[17] = 0; 
+  SKA_args_info_help[17] = SKA_args_info_detailed_help[27];
+  SKA_args_info_help[18] = 0; 
   
 }
 
-const char *SKA_args_info_help[18];
+const char *SKA_args_info_help[19];
 
 typedef enum {ARG_NO
   , ARG_FLAG
@@ -123,6 +126,7 @@ void clear_given (struct SKA_args_info *args_info)
   args_info->iterations_given = 0 ;
   args_info->file_delimiter_given = 0 ;
   args_info->no_log_given = 0 ;
+  args_info->enrichments_given = 0 ;
   args_info->independent_probs_given = 0 ;
   args_info->fmotif_given = 0 ;
   args_info->motif_given = 0 ;
@@ -145,6 +149,7 @@ void clear_args (struct SKA_args_info *args_info)
   args_info->file_delimiter_arg = gengetopt_strdup (",");
   args_info->file_delimiter_orig = NULL;
   args_info->no_log_flag = 0;
+  args_info->enrichments_flag = 0;
   args_info->independent_probs_flag = 0;
   args_info->fmotif_arg = NULL;
   args_info->fmotif_orig = NULL;
@@ -168,11 +173,12 @@ void init_args_info(struct SKA_args_info *args_info)
   args_info->iterations_help = SKA_args_info_detailed_help[13] ;
   args_info->file_delimiter_help = SKA_args_info_detailed_help[15] ;
   args_info->no_log_help = SKA_args_info_detailed_help[17] ;
-  args_info->independent_probs_help = SKA_args_info_detailed_help[21] ;
-  args_info->fmotif_help = SKA_args_info_detailed_help[23] ;
+  args_info->enrichments_help = SKA_args_info_detailed_help[21] ;
+  args_info->independent_probs_help = SKA_args_info_detailed_help[23] ;
+  args_info->fmotif_help = SKA_args_info_detailed_help[25] ;
   args_info->fmotif_min = 0;
   args_info->fmotif_max = 0;
-  args_info->motif_help = SKA_args_info_detailed_help[25] ;
+  args_info->motif_help = SKA_args_info_detailed_help[27] ;
   
 }
 
@@ -395,6 +401,8 @@ SKA_cmdline_parser_dump(FILE *outfile, struct SKA_args_info *args_info)
     write_into_file(outfile, "file-delimiter", args_info->file_delimiter_orig, 0);
   if (args_info->no_log_given)
     write_into_file(outfile, "no-log", 0, 0 );
+  if (args_info->enrichments_given)
+    write_into_file(outfile, "enrichments", 0, 0 );
   if (args_info->independent_probs_given)
     write_into_file(outfile, "independent-probs", 0, 0 );
   write_multiple_into_file(outfile, args_info->fmotif_given, "fmotif", args_info->fmotif_orig, 0);
@@ -1559,6 +1567,7 @@ SKA_cmdline_parser_internal (
         { "iterations",	1, NULL, 'r' },
         { "file-delimiter",	1, NULL, 'd' },
         { "no-log",	0, NULL, 0 },
+        { "enrichments",	0, NULL, 'R' },
         { "independent-probs",	0, NULL, 'p' },
         { "fmotif",	1, NULL, 0 },
         { "motif",	1, NULL, 0 },
@@ -1570,7 +1579,7 @@ SKA_cmdline_parser_internal (
       custom_opterr = opterr;
       custom_optopt = optopt;
 
-      c = custom_getopt_long (argc, argv, "hVi:b:o:k:r:d:p", long_options, &option_index);
+      c = custom_getopt_long (argc, argv, "hVi:b:o:k:r:d:Rp", long_options, &option_index);
 
       optarg = custom_optarg;
       optind = custom_optind;
@@ -1665,6 +1674,16 @@ SKA_cmdline_parser_internal (
               &(local_args_info.file_delimiter_given), optarg, 0, ",", ARG_STRING,
               check_ambiguity, override, 0, 0,
               "file-delimiter", 'd',
+              additional_error))
+            goto failure;
+        
+          break;
+        case 'R':	/* Compute the regular enrichments..  */
+        
+        
+          if (update_arg((void *)&(args_info->enrichments_flag), 0, &(args_info->enrichments_given),
+              &(local_args_info.enrichments_given), optarg, 0, 0, ARG_FLAG,
+              check_ambiguity, override, 1, 0, "enrichments", 'R',
               additional_error))
             goto failure;
         
