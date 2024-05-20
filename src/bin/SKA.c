@@ -40,6 +40,7 @@ typedef struct options {
 	char     file_delimiter;
 	bool     no_log;
 
+	bool     enrichments;
 	bool     independent_probs;
 	char   **fmotif;
 	char    *motif;
@@ -137,6 +138,12 @@ char
 delimiter_to_char(char *user_delimiter);
 
 void
+enrichments_to_file(KmerCounter *input, KmerCounter *bound, options *opt);
+
+void
+penrichments_to_file(IndependentProbCounts *counts, options *opt);
+
+void
 topkmer_to_file(TopKmer top_kmer, options *opt);
 
 void
@@ -169,6 +176,7 @@ init_default_options(options *opt)
 	opt->file_delimiter = ',';
 	opt->no_log         = false;
 
+	opt->enrichments        = false;
 	opt->independent_probs  = false;
 	opt->fmotif             = NULL;
 	opt->motif              = NULL;
@@ -282,6 +290,10 @@ main(int argc, char **argv)
 		opt.no_log = true;
 	}
 
+	if(args_info.enrichments_given) {
+		opt.enrichments = true;
+	}
+
 	if(args_info.independent_probs_given) {
 		opt.independent_probs = true;
 	}
@@ -386,8 +398,18 @@ process_iteration(options *opt)
 		top_kmer = get_top_kmer(opt->kmer_counts.input_counter,opt->kmer_counts.bound_counter);
 	}
 
-	/* Dump information into output file */
-	topkmer_to_file(top_kmer, opt);
+	if(opt->enrichments) {
+		if(opt->independent_probs){
+			penrichments_to_file(opt->counts, opt);
+		} else {
+			enrichments_to_file(opt->kmer_counts.input_counter, 
+			                    opt->kmer_counts.bound_counter, opt);
+		}
+		opt->cur_iter++;
+	} else {
+		/* Dump information into output file */
+		topkmer_to_file(top_kmer, opt);
+	}
 
 	/* Store information for next iteration */
 	opt->top_kmer[opt->cur_iter] = strdup(top_kmer.k_mer);
@@ -604,7 +626,7 @@ get_top_prediction(IndependentProbCounts *counts)
 
 		/* Get actual and predicted frequencies */
 		double kmer_frq = (double)counts->kmers->entries[i]/counts->kmers->total_count;
-		double predicted_frq = predict_kmer(top_kmer.k_mer, counts->monomers, counts->dimers);
+		double predicted_frq = predict_kmer(kseq, counts->monomers, counts->dimers);
 
 		/* if input_frq is 0, then div by 0 error would occur so skip */
 		if(predicted_frq == 0) {
@@ -613,7 +635,6 @@ get_top_prediction(IndependentProbCounts *counts)
 
 		/* get enrichment of current kmer */
 		double cur_enrichment = log2(kmer_frq/predicted_frq);
-		// printf("%s: log2(%f/%f) = %f\n",top_kmer.k_mer, kmer_frq,predicted_frq,cur_enrichment);
 
 		if(cur_enrichment > top_enrichment) {
 			top_enrichment = cur_enrichment;
@@ -942,6 +963,87 @@ delimiter_to_char(char *user_delimiter)
 }
 
 
+typedef struct Enrichments {
+	float enrichment;
+	unsigned int key;
+} Enrichments;
+
+
+int
+compare(const void *a, const void *b)
+{
+	const Enrichments *p1 = (Enrichments *)a;
+	const Enrichments *p2 = (Enrichments *)b;
+
+	if(p1->enrichment < p2->enrichment) {
+		return 1;
+	} else if(p1->enrichment > p2->enrichment) {
+		return -1;
+	} else {
+		return 0;
+	}
+}
+
+
+void
+enrichments_to_file(KmerCounter *input, KmerCounter *bound, options *opt)
+{
+	unsigned int capacity = input->capacity;
+	Enrichments *enrichments = s_malloc(capacity * sizeof(Enrichments));
+	for(unsigned int i=0; i<capacity; i++) {
+		float input_frq = (float)input->entries[i]/input->total_count;
+		float bound_frq = (float)bound->entries[i]/bound->total_count;
+		enrichments[i].enrichment = log2f(bound_frq/input_frq);
+		enrichments[i].key = i;
+	}
+
+	qsort(enrichments, capacity, sizeof(Enrichments), compare);
+	for(unsigned int i=0; i<capacity; i++) {
+		char kseq[17];
+		kctr_get_key(input, kseq, enrichments[i].key);
+		fprintf(opt->out_file, "%s%c%f\n", kseq, opt->file_delimiter, enrichments[i].enrichment);
+	}
+
+	free(enrichments);
+}
+
+
+void
+penrichments_to_file(IndependentProbCounts *counts, options *opt)
+{
+	Enrichments *enrichments = s_malloc(counts->kmers->capacity * sizeof(Enrichments));
+	for(unsigned int i=0; i<counts->kmers->capacity; i++) {
+		char kseq[17] = {0};
+		kctr_get_key(counts->kmers, kseq, i);
+
+		/* Get actual and predicted frequencies */
+		float kmer_frq = (float)counts->kmers->entries[i]/counts->kmers->total_count;
+		float predicted_frq = (float)predict_kmer(kseq, counts->monomers, counts->dimers);
+
+		/* if input_frq is 0, then div by 0 error would occur so skip */
+		// if(predicted_frq == 0) {
+		// 	continue;
+		// }
+
+		/* Get enrichment of current k-mer */
+		float cur_enrichment = log2f(kmer_frq/predicted_frq);
+
+		/* Store enrichments of current k-mer */
+		enrichments[i].enrichment = cur_enrichment;
+		enrichments[i].key = i;
+	}
+
+	qsort(enrichments, counts->kmers->capacity, sizeof(Enrichments), compare);
+	for(unsigned int i=0; i<counts->kmers->capacity; i++) {
+		char kseq[17];
+		kctr_get_key(counts->kmers, kseq, enrichments[i].key);
+		fprintf(opt->out_file, "%s%c%f\n", kseq, opt->file_delimiter, enrichments[i].enrichment);
+	}
+
+	free(enrichments);
+}
+
+
 void 
 topkmer_to_file(TopKmer top_kmer, options *opt)
 {
@@ -1005,7 +1107,7 @@ clusterlen_to_file(BinsLenInfo len, uint8_t bin, uint16_t lenlen, uint16_t
 void 
 free_options(options *opt)
 {
-	if(opt->input_file && !opt->independent_probs) {
+	if(opt->input_file) {
 		free(opt->input_file);
 	}
 	if(opt->bound_file) {
@@ -1029,10 +1131,31 @@ free_options(options *opt)
 		free(opt->fmotif);
 	}
 	if(opt->top_kmer) {
+		for(int i=0; i<opt->cur_iter; i++) {
+			free(opt->top_kmer[i]);
+		}
 		free(opt->top_kmer);
 	}
 	if(opt->out_file) {
 		fclose(opt->out_file);
+	}
+	if(opt->kmer_counts.input_counter) {
+		free_kcounter(opt->kmer_counts.input_counter);
+	}
+	if(opt->kmer_counts.bound_counter) {
+		free_kcounter(opt->kmer_counts.bound_counter);
+	}
+	if(opt->counts) {
+		if(opt->counts->kmers) {
+			free_kcounter(opt->counts->kmers);
+		}
+		if(opt->counts->dimers) {
+			free_kcounter(opt->counts->dimers);
+		}
+		if(opt->counts->monomers) {
+			free_kcounter(opt->counts->monomers);
+		}
+		free(opt->counts);
 	}
 }
 
