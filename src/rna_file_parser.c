@@ -150,16 +150,18 @@ rnaf_getm(RNA_FILE *rna_file, char *match)
 			ret = getm_line(rna_file->buffer, position);
 
 			/* Check that line is valid when file format is fastq */
-			if(ret.beginning_line && rna_file->filetype == 'q') {
+			if(rna_file->filetype == 'q' && ret.beginning_line) {
 				if(ret.end_line[0] == '\0') {
-					ret.beginning_line = NULL; // not enough information, rebuff and extract
+					ret.shift = ret.end_line - ret.beginning_line;
+					*(ret.end_line-1) = '\n';
+					ret.beginning_line = NULL;
 				} else if(ret.end_line[0] != '+') {
 					rna_file->getm_ptr = ret.end_line;
 					continue;
 				}
 			}
 
-			/* Check that line is valid when file format is fasta */
+			/* Check that line is valid when file format is fasta. This probably does not work. */
 			if(ret.beginning_line && rna_file->filetype == 'a') {
 				if(ret.end_line[0] == '\0' && !gzeof(rna_file->file)) {
 					ret.beginning_line = NULL; // not enough information, rebuff and extract
