@@ -145,7 +145,7 @@ decrement_kmer(KmerCounter *kcounter, const char *sequence,
 		return vals;
 	}
 
-	int end = pat_indx + kcounter->k_mer;
+	int end = pat_indx + strlen(pat);
 	end = end > max_end ? max_end : end;
 
 	int start = pat_indx - kcounter->k_mer + 1;
@@ -161,7 +161,7 @@ decrement_kmer(KmerCounter *kcounter, const char *sequence,
 		start++;
 	}
 
-	vals.shift = pat_indx + kcounter->k_mer;
+	vals.shift = pat_indx + strlen(pat);
 	vals.start = end - vals.shift;
 
 	return vals;
