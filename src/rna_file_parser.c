@@ -149,6 +149,26 @@ rnaf_getm(RNA_FILE *rna_file, char *match)
 			/* Get the line that the match is part of */
 			ret = getm_line(rna_file->buffer, position);
 
+			/* Check that line is valid when file format is fastq */
+			if(ret.beginning_line && rna_file->filetype == 'q') {
+				if(ret.end_line[0] == '\0') {
+					ret.beginning_line = NULL; // not enough information, rebuff and extract
+				} else if(ret.end_line[0] != '+') {
+					rna_file->getm_ptr = ret.end_line;
+					continue;
+				}
+			}
+
+			/* Check that line is valid when file format is fasta */
+			if(ret.beginning_line && rna_file->filetype == 'a') {
+				if(ret.end_line[0] == '\0' && !gzeof(rna_file->file)) {
+					ret.beginning_line = NULL; // not enough information, rebuff and extract
+				} else if(ret.end_line[0] != '>' && !gzeof(rna_file->file)) {
+					rna_file->getm_ptr = ret.end_line;
+					continue;
+				}
+			}
+
 			/* If the full line exists in buffer, great */
 			if(ret.beginning_line) {
 				rna_file->getm_ptr = ret.end_line;
