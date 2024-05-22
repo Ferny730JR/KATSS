@@ -64,19 +64,19 @@ target_include_directories(aspiire PRIVATE ${VIENNARNA_INCLUDE_DIRS})
 # Specify compiler options based on OS
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 	# SKA compiler options
-	target_compile_options(SKA PRIVATE -g -Wall -O3 -lm)
-	target_link_options(SKA PRIVATE -g -Wall -O3 -flto -fopenmp -lm)
+	target_compile_options(SKA PRIVATE -Wall -O3 -lm)
+	target_link_options(SKA PRIVATE -Wall -O3 -flto -fopenmp -lm)
 
 	# bppPipeline compiler options
-	target_compile_options(bppPipeline PRIVATE -g -Wall -O3 -lm)
-	target_link_options(bppPipeline PRIVATE -g -Wall -flto -fopenmp -O3 -lm -lstdc++)
+	target_compile_options(bppPipeline PRIVATE -Wall -O3 -lm)
+	target_link_options(bppPipeline PRIVATE -Wall -flto -fopenmp -O3 -lm -lstdc++)
 
 	# aspiire compiler options
 	target_compile_options(aspiire PRIVATE -Wall -Wextra -O3)
 	target_link_options(aspiire PRIVATE -Wall -Wextra -flto -fopenmp -O3 -lm -lstdc++)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin") # Apple
-	target_compile_options(SKA PRIVATE -g -Wall -Wextra -Wpedantic -flto -O3)
-	target_compile_options(bppPipeline PRIVATE -g -Wall -flto -O3)
+	target_compile_options(SKA PRIVATE -Wall -Wextra -Wpedantic -flto -O3)
+	target_compile_options(bppPipeline PRIVATE -Wall -flto -O3)
 	target_compile_options(aspiire PRIVATE -Wall -Wextra -flto -O3)
 else()
 	message( SEND_ERROR "System ${CMAKE_SYSTEM_NAME} currently not supported.")
