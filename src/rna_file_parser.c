@@ -163,9 +163,7 @@ rnaf_getm(RNA_FILE *rna_file, char *match)
 
 			/* Check that line is valid when file format is fasta. This probably does not work. */
 			if(ret.beginning_line && rna_file->filetype == 'a') {
-				if(ret.end_line[0] == '\0' && !gzeof(rna_file->file)) {
-					ret.beginning_line = NULL; // not enough information, rebuff and extract
-				} else if(ret.end_line[0] != '>' && !gzeof(rna_file->file)) {
+				if(ret.beginning_line[0] == '>') {
 					rna_file->getm_ptr = ret.end_line;
 					continue;
 				}
