@@ -80,7 +80,7 @@ void
 uncount_kmers(KmerCounter *counter, char *filename, options *opt);
 
 TopKmer
-get_top_kmer(KmerCounter *input_counter, KmerCounter *bound_counter);
+get_top_kmer(KmerCounter *input_counter, KmerCounter *bound_counter, bool normalize);
 
 IndependentProbCounts *
 count_dimonomers(char *filename, options *opt);
@@ -89,7 +89,7 @@ void
 uncount_dimonomers(char *filename, options *opt);
 
 TopKmer
-get_top_prediction(IndependentProbCounts *counts);
+get_top_prediction(IndependentProbCounts *counts, bool normalize);
 
 /* fmotif functions */
 void
@@ -388,7 +388,7 @@ process_iteration(options *opt)
 		} else {
 			uncount_dimonomers(opt->bound_file, opt);
 		}
-		top_kmer = get_top_prediction(opt->counts);
+		top_kmer = get_top_prediction(opt->counts, !opt->no_log);
 
 	/* Compute Iterative K-mer Knockout Analysis IKKA */
 	} else {
@@ -403,7 +403,8 @@ process_iteration(options *opt)
 		}
 
 		/* After getting counts, we can get the top k-mer */
-		top_kmer = get_top_kmer(opt->kmer_counts.input_counter,opt->kmer_counts.bound_counter);
+		top_kmer = get_top_kmer(opt->kmer_counts.input_counter,
+		                        opt->kmer_counts.bound_counter, !opt->no_log);
 	}
 
 	if(opt->enrichments) {
@@ -481,7 +482,7 @@ uncount_kmers(KmerCounter *counter, char *filename, options *opt)
 
 
 TopKmer
-get_top_kmer(KmerCounter *input_counter, KmerCounter *bound_counter)
+get_top_kmer(KmerCounter *input_counter, KmerCounter *bound_counter, bool normalize)
 {
 	TopKmer top_kmer = {.enrichment = -DBL_MAX};
 	unsigned int top_enrichment_hash;
@@ -503,7 +504,10 @@ get_top_kmer(KmerCounter *input_counter, KmerCounter *bound_counter)
 		}
 
 		/* get enrichment of current kmer */
-		double cur_enrichment = log2(bound_frq/input_frq);
+		double cur_enrichment = bound_frq/input_frq;
+		if(normalize) {
+			cur_enrichment = log2(cur_enrichment);
+		}
 
 		if(cur_enrichment > top_enrichment) {
 			top_enrichment = cur_enrichment;
@@ -623,7 +627,7 @@ predict_kmer(char *kseq, KmerCounter *monomer_counts, KmerCounter *dimer_counts)
 
 
 TopKmer
-get_top_prediction(IndependentProbCounts *counts)
+get_top_prediction(IndependentProbCounts *counts, bool normalize)
 {
 	TopKmer top_kmer = {.enrichment = -DBL_MAX};
 	double top_enrichment = -DBL_MAX;
@@ -642,7 +646,10 @@ get_top_prediction(IndependentProbCounts *counts)
 		}
 
 		/* get enrichment of current kmer */
-		double cur_enrichment = log2(kmer_frq/predicted_frq);
+		double cur_enrichment = kmer_frq/predicted_frq;
+		if(normalize) {
+			cur_enrichment = log2(cur_enrichment);
+		}
 
 		if(cur_enrichment > top_enrichment) {
 			top_enrichment = cur_enrichment;
@@ -687,7 +694,11 @@ process_fmotifs(options *opt)
 		bound_total -= (bound_numlines * strlen(opt->fmotif[i]));
 		double bound_frq = (double)bound_counts / bound_total;
 
-		fprintf(opt->out_file, "%s,%f", opt->fmotif[i], log2(bound_frq/input_frq));
+		double enrichment = bound_frq/input_frq;
+		if(!opt->no_log) {
+			enrichment = log2(enrichment);
+		}
+		fprintf(opt->out_file, "%s,%f", opt->fmotif[i], enrichment);
 	}
 }
 
@@ -1001,7 +1012,8 @@ enrichments_to_file(KmerCounter *input, KmerCounter *bound, options *opt)
 	for(unsigned int i=0; i<capacity; i++) {
 		float input_frq = (float)input->entries[i]/input->total_count;
 		float bound_frq = (float)bound->entries[i]/bound->total_count;
-		enrichments[i].enrichment = log2f(bound_frq/input_frq);
+		enrichments[i].enrichment = bound_frq/input_frq;
+		if(!opt->no_log) enrichments[i].enrichment = log2f(enrichments[i].enrichment);
 		enrichments[i].key = i;
 	}
 
@@ -1034,7 +1046,10 @@ penrichments_to_file(IndependentProbCounts *counts, options *opt)
 		// }
 
 		/* Get enrichment of current k-mer */
-		float cur_enrichment = log2f(kmer_frq/predicted_frq);
+		float cur_enrichment = kmer_frq/predicted_frq;
+		if(!opt->no_log) {
+			cur_enrichment = log2f(cur_enrichment);
+		}
 
 		/* Store enrichments of current k-mer */
 		enrichments[i].enrichment = cur_enrichment;
