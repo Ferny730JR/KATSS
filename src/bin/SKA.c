@@ -414,7 +414,6 @@ process_iteration(options *opt)
 			enrichments_to_file(opt->kmer_counts.input_counter, 
 			                    opt->kmer_counts.bound_counter, opt);
 		}
-		opt->cur_iter++;
 	} else {
 		/* Dump information into output file */
 		topkmer_to_file(top_kmer, opt);
@@ -446,7 +445,7 @@ count_kmers(char *filename, options *opt)
 
 		clean_seq(sequence, 0);
 
-		kctr_fincrement(counter, sequence);
+		kctr_increment(counter, sequence);
 		free(sequence);
 	}
 	rnaf_close(read_file);
@@ -485,7 +484,7 @@ TopKmer
 get_top_kmer(KmerCounter *input_counter, KmerCounter *bound_counter, bool normalize)
 {
 	TopKmer top_kmer = {.enrichment = -DBL_MAX};
-	unsigned int top_enrichment_hash;
+	unsigned int top_enrichment_hash = 0;
 	double top_enrichment = -DBL_MAX;
 
 	/* Sanity check, make sure total_count is greater than 0 */
@@ -553,9 +552,9 @@ count_dimonomers(char *filename, options *opt)
 		}
 
 		clean_seq(sequence, 0);
-		kctr_fincrement(counts->monomers, sequence);
-		kctr_fincrement(counts->dimers, sequence);
-		kctr_fincrement(counts->kmers, sequence);
+		kctr_increment(counts->monomers, sequence);
+		kctr_increment(counts->dimers, sequence);
+		kctr_increment(counts->kmers, sequence);
 
 		free(sequence);
 	}
@@ -591,6 +590,8 @@ uncount_dimonomers(char *filename, options *opt)
 		}
 
 		kctr_decrement(opt->counts->kmers, sequence, top_kmer);
+		kctr_decrement(opt->counts->monomers, sequence, top_kmer);
+		kctr_decrement(opt->counts->dimers, sequence, top_kmer);
 	}
 	rnaf_close(read_file);
 }
