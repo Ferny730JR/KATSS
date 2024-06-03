@@ -568,7 +568,7 @@ kmerHashTable *getBPPEnrichment(kmerHashTable *control_frq, kmerHashTable *bound
             if(bound_values[j] == 0. || control_values[j] == 0.) {
                 enrichment = 0.;
             } else {
-                enrichment = log(bound_values[j]/control_values[j])/log(2.);
+                enrichment = log2(bound_values[j]/control_values[j]);
             }
             kmer_add_value(enrichments_table, key, enrichment, j);
         }
