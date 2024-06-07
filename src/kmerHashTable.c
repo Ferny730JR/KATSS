@@ -14,7 +14,7 @@ typedef struct Hash {
 
 
 Entry *
-create_entry(const char   *key, unsigned int  col);
+create_entry(const char *key, unsigned int col);
 
 static Hash
 hash(const char *key);
@@ -31,6 +31,7 @@ init_kmer_table(unsigned int kmer, unsigned int cols)
 
 	hash_table->capacity = table_size;
 	hash_table->cols = cols;
+	hash_table->kmer = kmer;
 	hash_table->entries = s_malloc(table_size * sizeof(Entry*));
 	pthread_mutex_init(&hash_table->lock, NULL);
 
@@ -54,12 +55,12 @@ kmer_get(kmerHashTable *hash_table, const char *key)
 {
 	Hash hash_value = hash(key);
 
-	if (strcmp(hash_table->entries[hash_value.hash]->key, key) == 0) {
+	// if (strcmp(hash_table->entries[hash_value.hash]->key, key) == 0) {
 		return hash_table->entries[hash_value.hash]->values;
-	}
-	error_message("Unable to get values from table.\n"
-	              "Expected key: '%s' - Actual key: '%s'",key, hash_table->entries[hash_value.hash]->key);
-	exit(EXIT_FAILURE);
+	// }
+	// error_message("Unable to get values from table.\n"
+	//               "Expected key: '%s' - Actual key: '%s'",key, hash_table->entries[hash_value.hash]->key);
+	// exit(EXIT_FAILURE);
 }
 
 
@@ -85,16 +86,16 @@ kmer_add_value(kmerHashTable   *hash_table,
 		hash_table->entries[hash_value.hash] = new_item;
 	}
 
-	if (strcmp(hash_table->entries[hash_value.hash]->key, key) == 0) {
+	// if (strcmp(hash_table->entries[hash_value.hash]->key, key) == 0) {
 		pthread_mutex_lock(&hash_table->lock);
 		hash_table->entries[hash_value.hash]->values[value_index] += value;
 		pthread_mutex_unlock(&hash_table->lock);
-		return;
-	}
+		// return;
+	// }
 
-	error_message("Unable to add value to table.\n"
-	              "Expected key: '%s' - Actual key: '%s'",key, hash_table->entries[hash_value.hash]->key);
-	exit(EXIT_FAILURE);
+	// error_message("Unable to add value to table.\n"
+	//               "Expected key: '%s' - Actual key: '%s'",key, hash_table->entries[hash_value.hash]->key);
+	// exit(EXIT_FAILURE);
 }
 
 
@@ -102,7 +103,7 @@ Entry *
 create_entry(const char *key, unsigned int col)
 {
 	Entry *entry = s_malloc(sizeof *entry);
-	entry->key = strdup(key);
+	// entry->key = strdup(key);
 	entry->values = s_calloc(col, sizeof(double));
 
 	return entry;
@@ -132,7 +133,7 @@ hash(const char *key)
 void
 free_entry(Entry *entry)
 {
-	free(entry->key);
+	// free(entry->key);
 	free(entry->values);
 	free(entry);
 }
@@ -153,6 +154,23 @@ free_kmer_table(kmerHashTable *hash_table)
 
 
 void
+unhash(char *key, unsigned int hash_value, int length, int is_t) 
+{
+	key[length] = '\0'; // Null-terminate the string
+
+	for (int i = length - 1; i >= 0; i--) {
+		switch (hash_value % 4) {
+			case 0: key[i] = 'A'; break;
+			case 1: key[i] = 'C'; break;
+			case 2: key[i] = 'G'; break;
+			case 3: key[i] = is_t ? 'T' : 'U'; break;
+		}
+		hash_value /= 4;
+	}
+}
+
+
+void
 print_table_to_file(kmerHashTable *table, FILE *table_file, char sep)
 {
 	for(unsigned long i = 0; i < table->capacity; i++) {
@@ -160,7 +178,9 @@ print_table_to_file(kmerHashTable *table, FILE *table_file, char sep)
 			continue;
 		}
 
-		fprintf(table_file, "%s", table->entries[i]->key);
+		char *key = s_malloc(table->kmer+1);
+		unhash(key, table->entries[i]->hash, table->kmer, 0);
+		fprintf(table_file, "%s", key);
 		for(unsigned long j = 0; j < table->cols; j++) {
 			fprintf(table_file, "%c%9.6f", sep, table->entries[i]->values[j]);
 		}
@@ -195,7 +215,7 @@ print_kmer_table(kmerHashTable *hash_table)
 			continue;
 		}
 
-		printf("Key: %s, Values: ", hash_table->entries[i]->key);
+		// printf("Key: %s, Values: ", hash_table->entries[i]->key);
 		for(unsigned long j = 0; j < hash_table->cols; j++) {
 			printf("%f ",hash_table->entries[i]->values[j]);
 		}

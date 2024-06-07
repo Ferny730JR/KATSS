@@ -9,7 +9,8 @@
  *  kmer and the value is a double array
 */
 typedef struct {
-	char *key;
+	unsigned int num_values;
+	unsigned int hash;
 	double *values;
 } Entry;
 
@@ -20,6 +21,7 @@ typedef struct {
 typedef struct {
 	unsigned long   capacity;
 	unsigned int    cols;
+	unsigned int    kmer;
 	Entry           **entries;
 	pthread_mutex_t lock;
 } kmerHashTable;

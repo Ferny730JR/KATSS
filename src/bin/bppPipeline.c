@@ -579,7 +579,6 @@ kmerHashTable *
 getBPPEnrichment(kmerHashTable *control_frq, kmerHashTable *bound_frq, int kmer)
 {
 	kmerHashTable   *enrichments_table;
-	char            *key;
 	double          enrichment;
 	double          *bound_values;
 	double          *control_values;
@@ -594,10 +593,13 @@ getBPPEnrichment(kmerHashTable *control_frq, kmerHashTable *bound_frq, int kmer)
 			continue;
 		}
 
-		key = bound_frq->entries[i]->key;
+		bound_values   = bound_frq->entries[i]->values;
+		control_values = control_frq->entries[i]->values;
 
-		bound_values   = kmer_get(bound_frq, key);
-		control_values = kmer_get(control_frq, key);
+		enrichments_table->entries[i] = s_malloc(sizeof(Entry));
+		enrichments_table->entries[i]->num_values = enrichments_table->cols;
+		enrichments_table->entries[i]->hash = i;
+		enrichments_table->entries[i]->values = s_calloc(enrichments_table->cols, sizeof(double));
 
 		for(int j = 0; j < kmer; j++) {
 			if(bound_values[j] == 0. || control_values[j] == 0.) {
@@ -605,7 +607,8 @@ getBPPEnrichment(kmerHashTable *control_frq, kmerHashTable *bound_frq, int kmer)
 			} else {
 				enrichment = log2(bound_values[j]/control_values[j]);
 			}
-			kmer_add_value(enrichments_table, key, enrichment, j);
+			enrichments_table->entries[i]->values[j] = enrichment;
+			// kmer_add_value(enrichments_table, key, enrichment, j);
 		}
 	}
 
@@ -614,8 +617,7 @@ getBPPEnrichment(kmerHashTable *control_frq, kmerHashTable *bound_frq, int kmer)
 			continue;
 		}
 
-		key = enrichments_table->entries[i]->key;
-		enrichment_values = kmer_get(enrichments_table, key);
+		enrichment_values = enrichments_table->entries[i]->values;
 
 		mean_enrichment = 0.0f;
 		for(int j = 0; j < kmer; j++) {
@@ -623,7 +625,8 @@ getBPPEnrichment(kmerHashTable *control_frq, kmerHashTable *bound_frq, int kmer)
 		}
 
 		mean_enrichment/=kmer;
-		kmer_add_value(enrichments_table, key, mean_enrichment, kmer);
+		enrichments_table->entries[i]->values[kmer] = mean_enrichment;
+		// kmer_add_value(enrichments_table, key, mean_enrichment, kmer);
 	}
 
 	qsort(enrichments_table->entries, enrichments_table->capacity,
@@ -717,8 +720,7 @@ compare(const void *a, const void *b)
 	if(!entryB) {
 		return -1;
 	}
-
-	int mean_index = strlen(entryA->key);
+	int mean_index = entryA->num_values-1;
 	if(entryA->values[mean_index] > entryB->values[mean_index]) {
 		return -1;
 	}
