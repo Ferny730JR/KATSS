@@ -7,11 +7,16 @@
 #include "utils.h"
 #include "string_utils.h"
 
-Entry *
-create_entry(const char   *key, 
-             unsigned int  col);
+typedef struct Hash {
+	unsigned int hash;
+	unsigned int errno;
+} Hash;
 
-unsigned int
+
+Entry *
+create_entry(const char   *key, unsigned int  col);
+
+static Hash
 hash(const char *key);
 
 void
@@ -47,12 +52,13 @@ init_bpp_table(unsigned int kmer)
 double *
 kmer_get(kmerHashTable *hash_table, const char *key)
 {
-	unsigned int index = hash(key);
-	if (strcmp(hash_table->entries[index]->key, key) == 0) {
-		return hash_table->entries[index]->values;
+	Hash hash_value = hash(key);
+
+	if (strcmp(hash_table->entries[hash_value.hash]->key, key) == 0) {
+		return hash_table->entries[hash_value.hash]->values;
 	}
 	error_message("Unable to get values from table.\n"
-	              "Expected key: '%s' - Actual key: '%s'",key, hash_table->entries[index]->key);
+	              "Expected key: '%s' - Actual key: '%s'",key, hash_table->entries[hash_value.hash]->key);
 	exit(EXIT_FAILURE);
 }
 
@@ -69,22 +75,25 @@ kmer_add_value(kmerHashTable   *hash_table,
 		exit(EXIT_FAILURE);
 	}
 
-	unsigned int index = hash(key);
-
-	if(hash_table->entries[index] == NULL) { // make new entry if not initialized
-		Entry *new_item = create_entry(key, hash_table->cols);
-		hash_table->entries[index] = new_item;
+	Hash hash_value = hash(key);
+	if(hash_value.errno == 1) {
+		return;
 	}
 
-	if (strcmp(hash_table->entries[index]->key, key) == 0) {
+	if(hash_table->entries[hash_value.hash] == NULL) { // make new entry if not initialized
+		Entry *new_item = create_entry(key, hash_table->cols);
+		hash_table->entries[hash_value.hash] = new_item;
+	}
+
+	if (strcmp(hash_table->entries[hash_value.hash]->key, key) == 0) {
 		pthread_mutex_lock(&hash_table->lock);
-		hash_table->entries[index]->values[value_index] += value;
+		hash_table->entries[hash_value.hash]->values[value_index] += value;
 		pthread_mutex_unlock(&hash_table->lock);
 		return;
 	}
 
 	error_message("Unable to add value to table.\n"
-	              "Expected key: '%s' - Actual key: '%s'",key, hash_table->entries[index]->key);
+	              "Expected key: '%s' - Actual key: '%s'",key, hash_table->entries[hash_value.hash]->key);
 	exit(EXIT_FAILURE);
 }
 
@@ -100,7 +109,7 @@ create_entry(const char *key, unsigned int col)
 }
 
 
-unsigned int
+static Hash
 hash(const char *key)
 {
 	// Assuming the key is composed of 'A', 'U/T', 'C', 'G' characters
@@ -110,11 +119,13 @@ hash(const char *key)
 			case 'A': hash_value = hash_value * 4;     break;
 			case 'C': hash_value = hash_value * 4 + 1; break;
 			case 'G': hash_value = hash_value * 4 + 2; break;
-			default : hash_value = hash_value * 4 + 3; break;
+			case 'T': hash_value = hash_value * 4 + 3; break;
+			case 'U': hash_value = hash_value * 4 + 3; break;
+			default : return (Hash){.hash = 0, .errno = 1};
 		}
 		key++;
 	}
-	return hash_value;
+	return (Hash){.hash = hash_value, .errno = 0};
 }
 
 
