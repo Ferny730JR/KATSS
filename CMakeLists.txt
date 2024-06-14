@@ -26,7 +26,6 @@ add_executable(SKA
 	src/bin/SKA_cmdl.c
 	src/rna_file_parser.c
 	src/kmer_counter.c
-	src/kmerHashTable.c
 	src/string_utils.c
 	src/utils.c
 	src/Regex.c)
