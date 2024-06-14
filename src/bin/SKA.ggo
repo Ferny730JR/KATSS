@@ -99,16 +99,6 @@ details="Using the dinucleotide and mononucleotide frequencies of the target dat
 flag
 off
 
-option "fmotif" -
-"Search for a specific fixed motif, rather than all k-mers.\n"
-details="If this option is provided, the SKA program will search for the specified motif pattern.\
- SKA will find all exact matches in the input and bound files, and get the enrichment of that specific\
- motif.\n"
-string
-typestr="string"
-optional
-multiple
-
 option "motif" -
 "Search for a specific motif, rather than all k-mers.\n"
 details="If this option is provided, then the SKA program will search for specific k-mer sequences\

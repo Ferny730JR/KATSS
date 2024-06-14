@@ -42,7 +42,6 @@ typedef struct options {
 
 	bool     enrichments;
 	bool     independent_probs;
-	char   **fmotif;
 	char    *motif;
 	int      num_motifs;
 
@@ -90,13 +89,6 @@ uncount_dimonomers(char *filename, options *opt);
 
 TopKmer
 get_top_prediction(IndependentProbCounts *counts, bool normalize);
-
-/* fmotif functions */
-void
-process_fmotifs(options *opt);
-
-uint64_t
-count_fmotifs(char *filename, char *fmotif);
 
 /* motif pattern search functions */
 void
@@ -178,7 +170,6 @@ init_default_options(options *opt)
 
 	opt->enrichments        = false;
 	opt->independent_probs  = false;
-	opt->fmotif             = NULL;
 	opt->motif              = NULL;
 
 	opt->top_kmer       = NULL;
@@ -298,23 +289,8 @@ main(int argc, char **argv)
 		opt.independent_probs = true;
 	}
 
-	if(args_info.fmotif_given) {
-		opt.fmotif = s_malloc(args_info.fmotif_given * sizeof(char*));
-		for(uint32_t i = 0; i < args_info.fmotif_given; i++) {
-			opt.fmotif[i] = strdup(args_info.fmotif_arg[i]);
-		}
-		opt.num_motifs = args_info.fmotif_given;
-	}
-
 	if(args_info.motif_given) {
 		opt.motif = strdup(args_info.motif_arg);
-	}
-
-	if(args_info.motif_given && args_info.fmotif_given) {
-		error_message("--motif and --fmotif given! Please use only one.");
-		SKA_cmdline_parser_free(&args_info);
-		free_options(&opt);
-		exit(EXIT_FAILURE);
 	}
 
 	if(args_info.iterations_given && args_info.enrichments_given) {
@@ -353,9 +329,7 @@ main(int argc, char **argv)
 	#  Computations                                            #
 	##########################################################*/
 
-	if(opt.fmotif) {
-		process_fmotifs(&opt);
-	} else if (opt.motif) {
+  	if (opt.motif) {
 		process_motifs(&opt);
 	} else {
 		while(opt.cur_iter < opt.iterations) {
@@ -668,58 +642,6 @@ get_top_prediction(IndependentProbCounts *counts, bool normalize)
 
 	/* Everything (probably) worked! Hurray, now return. */
 	return top_kmer;
-}
-
-
-void
-process_fmotifs(options *opt)
-{
-	RNA_FILE *input_file = rnaf_open(opt->input_file);
-	RNA_FILE *bound_file = rnaf_open(opt->bound_file);
-
-	uint64_t input_numlines = rnaf_numlines(input_file);
-	uint64_t bound_numlines = rnaf_numlines(input_file);
-
-	uint64_t input_total = rnaf_numchars(input_file);
-	uint64_t bound_total = rnaf_numchars(bound_file);
-
-	rnaf_close(input_file);
-	rnaf_close(bound_file);
-
-	for(int i = 0; i < opt->num_motifs; i++) {
-		uint64_t input_counts = count_fmotifs(opt->input_file, opt->fmotif[i]);
-		input_total -= (input_numlines * strlen(opt->fmotif[i]));
-		double input_frq = (double)input_counts / input_total;
-
-		uint64_t bound_counts = count_fmotifs(opt->bound_file, opt->fmotif[i]);
-		bound_total -= (bound_numlines * strlen(opt->fmotif[i]));
-		double bound_frq = (double)bound_counts / bound_total;
-
-		double enrichment = bound_frq/input_frq;
-		if(!opt->no_log) {
-			enrichment = log2(enrichment);
-		}
-		fprintf(opt->out_file, "%s,%f", opt->fmotif[i], enrichment);
-	}
-}
-
-
-uint64_t
-count_fmotifs(char *filename, char *fmotif)
-{	/* Open file to read */
-	RNA_FILE *read_file = rnaf_open(filename);
-	rnaf_rebuff(read_file, 65536);
-
-	uint64_t total_matches = 0;
-	size_t fmotif_len = strlen(fmotif) - 1;
-
-	/* Loop through entire file and search for fmotif */
-	while(rnaf_oread(read_file, fmotif_len)) {
-		total_matches += rnaf_search(read_file, fmotif);
-	}
-	rnaf_close(read_file);
-
-	return total_matches;
 }
 
 
@@ -1142,12 +1064,6 @@ free_options(options *opt)
 	}
 	if(opt->motif) {
 		free(opt->motif);
-	}
-	if(opt->fmotif) {
-		for(int i=0; i < opt->num_motifs; i++) {
-			free(opt->fmotif[i]);
-		}
-		free(opt->fmotif);
 	}
 	if(opt->top_kmer) {
 		for(int i=0; i<opt->cur_iter; i++) {
