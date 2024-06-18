@@ -100,31 +100,6 @@ process_motif(char *motif, options *opt);
 RegexCluster *
 count_motifs(char *filename, char *pattern);
 
-void
-process_motif_match(RegexCluster *cluster, Matcher matcher, char *search);
-
-void
-get_cluster_frequencies(RegexCluster *cluster);
-
-void
-get_bin_frequencies(RegexBins *bin);
-
-void
-get_pos_frequencies(BinsLenInfo *len, uint16_t num_pos);
-
-double
-get_pos_total(LenPosInfo pos);
-
-RegexCluster *
-get_cluster_enrichment(RegexCluster *input_cluster, RegexCluster *bound_cluster, char *pattern);
-
-void
-get_bin_enrichment(RegexBins *enr_bin, RegexBins in_bin, RegexBins bo_bin);
-
-void
-get_pos_enrichments(BinsLenInfo *enr_len, BinsLenInfo in_len, 
-                    BinsLenInfo bo_len, uint16_t num_pos);
-
 /* Helper functions */
 char
 delimiter_to_char(char *user_delimiter);
@@ -139,21 +114,10 @@ void
 topkmer_to_file(TopKmer top_kmer, options *opt);
 
 void
-cluster_to_file(FILE *file, RegexCluster *cluster, char delimiter);
-
-void
-clusterlen_to_file(BinsLenInfo len, uint8_t bin, uint16_t lenlen, uint16_t 
-                   maxlen, FILE *file, char delimiter);
-
-void
 free_options(options *opt);
 
 void
 print_options(options *opt);
-
-void
-print_cluster(RegexCluster *cluster);
-
 
 void 
 init_default_options(options *opt)
@@ -650,7 +614,7 @@ process_motifs(options *opt)
 {
 	RegexCluster *enrichment;
 
-	/* Check if motif is a file */
+	/* Check if motif is NOT a file */
 	if(access(opt->motif, F_OK) != 0) {
 		enrichment = process_motif(opt->motif, opt);
 		if(enrichment == NULL) {
@@ -748,7 +712,7 @@ count_motifs(char *filename, char *pattern)
 			if(!matcher.isFound) { break; }
 
 			/* Process match. Shift buffer by search_index due to search starting from offset*/
-			process_motif_match(cluster, matcher, read_file->buffer+search_index);
+			//process_motif_match(cluster, matcher, read_file->buffer+search_index);
 			search_index += matcher.foundAtIndex+matcher.matchLength;
 		}
 	}
@@ -758,114 +722,6 @@ count_motifs(char *filename, char *pattern)
 	return cluster;
 }
 
-
-void
-process_motif_match(RegexCluster *cluster, Matcher matcher, char *search)
-{
-	cluster->total++;
-
-	uint8_t clusterIndex = 0;
-	while(matcher.cluster[clusterIndex].binType != BIN_END_OF_PATTERN) {
-		int32_t binClusterLength = matcher.cluster[clusterIndex].clusterLength;
-
-		for(int32_t index = 0; index < binClusterLength; index++) {
-			int32_t binStartIndex = matcher.cluster[clusterIndex].startIndex + index;
-			reclustAddNT(cluster, search[binStartIndex], clusterIndex, binClusterLength, index);
-		}
-		clusterIndex++;
-	}
-}
-
-
-void
-get_cluster_frequencies(RegexCluster *cluster)
-{
-	for(uint8_t num_bin = 0; num_bin < cluster->num_bins; num_bin++) {
-		get_bin_frequencies(&cluster->bin[num_bin]);
-	}
-}
-
-
-void
-get_bin_frequencies(RegexBins *bin)
-{
-	uint32_t num_lens = (bin->maxLen - bin->minLen) + 1;
-	for(uint32_t cur_len = 0; cur_len < num_lens; cur_len++) {
-		/* Get the frequency of the current length */
-		bin->len[cur_len].total /= bin->total;
-
-		/* Get the frequencies of the NT in the current length*/
-		uint16_t lenlen = bin->minLen + cur_len;
-		get_pos_frequencies(&bin->len[cur_len], lenlen);
-	}
-}
-
-
-void
-get_pos_frequencies(BinsLenInfo *len, uint16_t num_pos)
-{
-	for(uint16_t cur_pos = 0; cur_pos < num_pos; cur_pos++) {
-		double nt_total = get_pos_total(len->pos[cur_pos]);
-		len->pos[cur_pos].A /= nt_total;
-		len->pos[cur_pos].C /= nt_total;
-		len->pos[cur_pos].G /= nt_total;
-		len->pos[cur_pos].T /= nt_total;
-	}
-}
-
-
-double
-get_pos_total(LenPosInfo pos)
-{
-	return pos.A + pos.C + pos.G + pos.T;
-}
-
-
-RegexCluster *
-get_cluster_enrichment(RegexCluster *input_cluster, RegexCluster *bound_cluster, char *pattern)
-{	/* Create the enrichment cluster */
-	Regex regex;
-	regexCompile(&regex, pattern);
-	RegexCluster *enrichment_cluster = regexClusterInit(&regex);
-
-	/* Get overall enrichment */
-	enrichment_cluster->total = bound_cluster->total / input_cluster->total;
-
-	/* Get the enrichments for the bins */
-	for(uint8_t cur_bin = 0; cur_bin < enrichment_cluster->num_bins; cur_bin++) {
-		get_bin_enrichment(&enrichment_cluster->bin[cur_bin],
-		                   input_cluster->bin[cur_bin],
-		                   bound_cluster->bin[cur_bin]);
-	}
-
-	return enrichment_cluster;
-}
-
-
-void
-get_bin_enrichment(RegexBins *enr_bin, RegexBins in_bin, RegexBins bo_bin)
-{
-	uint32_t num_lens = (enr_bin->maxLen - enr_bin->minLen) + 1;
-	for(uint32_t cur_len = 0; cur_len < num_lens; cur_len++) {
-		enr_bin->len[cur_len].total = bo_bin.len[cur_len].total / in_bin.len[cur_len].total;
-
-		uint16_t lenlen = enr_bin->minLen + cur_len;
-		get_pos_enrichments(&enr_bin->len[cur_len], in_bin.len[cur_len], 
-		                     bo_bin.len[cur_len], lenlen);
-	}
-}
-
-
-void
-get_pos_enrichments(BinsLenInfo *enr_len, BinsLenInfo in_len, BinsLenInfo bo_len, uint16_t num_pos)
-{
-	for(uint16_t cur_pos = 0; cur_pos < num_pos; cur_pos++) {
-		enr_len->pos[cur_pos].A = bo_len.pos[cur_pos].A / in_len.pos[cur_pos].A;
-		enr_len->pos[cur_pos].C = bo_len.pos[cur_pos].C / in_len.pos[cur_pos].C;
-		enr_len->pos[cur_pos].G = bo_len.pos[cur_pos].G / in_len.pos[cur_pos].G;
-		enr_len->pos[cur_pos].T = bo_len.pos[cur_pos].T / in_len.pos[cur_pos].T;
-	}
-}
 /*##########################################################
 #  Helper Functions                                        #
 ##########################################################*/
@@ -1000,56 +856,6 @@ topkmer_to_file(TopKmer top_kmer, options *opt)
 }
 
 
-void
-cluster_to_file(FILE *file, RegexCluster *cluster, char delimiter)
-{
-	/* Get the max len */
-	uint16_t cur, max_len = 0;
-	for(uint8_t cur_bin = 0; cur_bin < cluster->num_bins; cur_bin++)
-	{
-		cur = (cluster->bin[cur_bin].maxLen - cluster->bin[cur_bin].minLen) + 1;
-		if(cur>max_len) {
-			max_len = cur;
-		}
-	}
-
-	/* Print the header of CSV file */
-	fprintf(file, "bin%clength%clength_pref", delimiter, delimiter);
-	for(uint16_t i = 0; i < max_len; i++) {
-		fprintf(file, "%cNT%d_pref", delimiter, i+1);
-	}
-	fprintf(file, "\n");
-
-	/* Output cluster to file */
-	for(uint8_t cur_bin = 0; cur_bin < cluster->num_bins; cur_bin++) {
-		uint16_t num_lens = (cluster->bin[cur_bin].maxLen - cluster->bin[cur_bin].minLen) + 1;
-		for(uint16_t cur_len = 0; cur_len < num_lens; cur_len++) {
-			uint16_t lenlen = cur_len + cluster->bin[cur_bin].minLen;
-			clusterlen_to_file(cluster->bin[cur_bin].len[cur_len], cur_bin, lenlen, max_len, file, delimiter);
-		}
-	}
-}
-
-
-void
-clusterlen_to_file(BinsLenInfo len, uint8_t bin, uint16_t lenlen, uint16_t 
-                   maxlen, FILE *file, char delimiter)
-{
-	fprintf(file, "%d,%d,%f",bin+1,lenlen,len.total);
-	for(uint16_t cur = 0; cur < maxlen; cur++) {
-		if(cur < lenlen) {
-			fprintf(file, "%c\"A:%f", delimiter, len.pos[cur].A);
-			fprintf(file, "%cC:%f", delimiter, len.pos[cur].C);
-			fprintf(file, "%cG:%f", delimiter, len.pos[cur].G);
-			fprintf(file, "%cT:%f\"", delimiter, len.pos[cur].T);
-		} else {
-			fprintf(file, "%c-", delimiter);
-		}
-	}
-	fprintf(file, "\n");
-}
-
-
 void 
 free_options(options *opt)
 {
@@ -1104,28 +910,4 @@ print_options(options *opt)
 	printf("kmer: '%d'\n",opt->kmer);
 	printf("iterations: '%d'\n",opt->iterations);
 	printf("probs: '%d'\n",opt->independent_probs);
-}
-
-
-void
-print_cluster(RegexCluster *cluster)
-{
-	for(int i=0; i<cluster->num_bins; i++) {
-		printf("bins[%d] = { max: %d, min: %d, total: %f\n",i+1,cluster->bin[i].maxLen, cluster->bin[i].minLen,cluster->bin[i].total);
-		int num_lens = (cluster->bin[i].maxLen - cluster->bin[i].minLen) + 1;
-		for(int len=0; len < num_lens; len++) {
-			int lenlen = len + cluster->bin[i].minLen;
-			printf("    len[%d] = {\n        .total=%f,\n",lenlen,cluster->bin[i].len[len].total);
-			for(int pos=0; pos < lenlen; pos++) {
-				printf("        .pos[%d] = {",pos+1);
-				printf(".A=%f ",cluster->bin[i].len[len].pos[pos].A);
-				printf(".C=%f ",cluster->bin[i].len[len].pos[pos].C);
-				printf(".G=%f ",cluster->bin[i].len[len].pos[pos].G);
-				printf(".T=%f ",cluster->bin[i].len[len].pos[pos].T);
-				printf("}\n");
-			}
-			printf("    }\n");
-		}
-		printf("}\n");
-	}
 }

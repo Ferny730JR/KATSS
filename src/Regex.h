@@ -4,6 +4,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <ctype.h>
+
+#include "kmer_counter.h"
+
 /*
 MIT License
 
@@ -139,8 +142,8 @@ typedef struct RegexBins {
 } RegexBins;
 
 typedef struct RegexCluster {
-	struct RegexBins *bin;
-	uint8_t num_bins;
+	KmerCounter **counters;
+	uint8_t num_kctr;
 	double total;
 } RegexCluster;
 
