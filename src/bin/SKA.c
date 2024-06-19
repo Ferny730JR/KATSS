@@ -731,12 +731,19 @@ motif_fileshift(RNA_FILE *read_file, uint32_t search_index, unsigned int pat_len
 				shift = 0;
 			}
 		}
-	}
-
-	if(read_file->filetype == 'q' && read_file->buffer[shift] == '+') {
+	} else if(read_file->filetype == 'q' && read_file->buffer[shift] == '+') {
 		bool repeat = true;
 		while(read_file->buffer[shift] != '\n' || repeat) {
 			if(read_file->buffer[shift] == '\n') repeat = false;
+			shift++;
+			if(read_file->buffer[shift] == '\0') {
+				size_t ret = rnaf_oread(read_file, pat_length);
+				if(ret == 0) return 100000;
+				shift = 0;
+			}
+		}
+	} else if(read_file->filetype == 'a' && read_file->buffer[shift] == '>') {
+		while(read_file->buffer[shift] != '\n') {
 			shift++;
 			if(read_file->buffer[shift] == '\0') {
 				size_t ret = rnaf_oread(read_file, pat_length);
