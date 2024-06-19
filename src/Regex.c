@@ -184,7 +184,7 @@ RegexCluster *regexClusterInit(Regex *regex) {
 	}
 
 	/* Init the bins in cluster */
-	regexCluster->counters = s_malloc(regexCluster->num_kctr * sizeof(KmerCounter));
+	regexCluster->counters = s_malloc(regexCluster->num_kctr * sizeof *regexCluster->counters);
 
 	/* Init the length and positional information in cluster */
 	uint8_t binIndex = 0;
@@ -208,7 +208,7 @@ RegexCluster *regexClusterInit(Regex *regex) {
 		} else if(re_node[1].patternType == REGEX_LAZY_PLUS) {
 			// todo
 		} else if(isQuantifier(re_node[0].patternType)) {
-			initBin(regexCluster, binIndex, 1, 1);
+			initBin(regexCluster, binIndex, 1, 0);
 			binIndex++;
 		}
 	} while(re_node++);
@@ -217,12 +217,11 @@ RegexCluster *regexClusterInit(Regex *regex) {
 }
 
 static void initBin(RegexCluster *regexCluster, uint32_t bin, uint32_t min, uint32_t max) {
-	if(min != max) {
+	if(0 != max) {
 		error_message("`motif' quantifier is not exact.");
 		return;
 	}
-
-	regexCluster->counters[bin] = init_kcounter(max);
+	*(regexCluster->counters+bin) = init_kcounter(min);
 }
 
 static bool isQuantifier(RegexPatternType patternType) {

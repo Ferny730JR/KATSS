@@ -94,11 +94,20 @@ get_top_prediction(IndependentProbCounts *counts, bool normalize);
 void
 process_motifs(options *opt);
 
-RegexCluster *
+void
 process_motif(char *motif, options *opt);
 
 RegexCluster *
 count_motifs(char *filename, char *pattern);
+
+uint32_t
+motif_fileshift(RNA_FILE *read_file, uint32_t search_index, unsigned int pat_length);
+
+void
+process_motif_match(RegexCluster *cluster, Matcher matcher, char *search, char filetype);
+
+void
+motif_enrichments(RegexCluster *input, RegexCluster *bound, options *opt);
 
 /* Helper functions */
 char
@@ -612,17 +621,9 @@ get_top_prediction(IndependentProbCounts *counts, bool normalize)
 void
 process_motifs(options *opt)
 {
-	RegexCluster *enrichment;
-
 	/* Check if motif is NOT a file */
 	if(access(opt->motif, F_OK) != 0) {
-		enrichment = process_motif(opt->motif, opt);
-		if(enrichment == NULL) {
-			return;
-		}
-
-		fprintf(opt->out_file, "%s%c%f\n", opt->motif, opt->file_delimiter, enrichment->total);
-		cluster_to_file(opt->out_file, enrichment, opt->file_delimiter);
+		process_motif(opt->motif, opt);
 		return;
 	}
 
@@ -638,45 +639,32 @@ process_motifs(options *opt)
 		remove_escapes(buf);
 
 		/* Calculate the cluster enrichments of the motif */
-		RegexCluster *enrichment = process_motif(buf, opt);
-		if(enrichment == NULL) {
-			return;
-		}
-
-		/* Output the cluster enrichments to file */
-		fprintf(opt->out_file, "%s%c%f\n", buf, opt->file_delimiter, enrichment->total);
-		cluster_to_file(opt->out_file, enrichment, opt->file_delimiter);
-		fprintf(opt->out_file, "\n");
+		process_motif(buf, opt);
 	}
 }
 
 
-RegexCluster *
+void
 process_motif(char *motif, options *opt)
 {
 	/* Get the counts and frequencies of the motif matches in the input file */
 	RegexCluster *input = count_motifs(opt->input_file, motif);
-	if(input) {
-		get_cluster_frequencies(input);
-	} else {
-		return NULL; // failed to open file, so break
+	if(!input) {
+		return;
 	}
 
 	/* Get the counts and frequencies of the motif matches in the bound file */
 	RegexCluster *bound = count_motifs(opt->bound_file, motif);
-	if(bound) {
-		get_cluster_frequencies(bound);
-	} else {
+	if(!bound) {
 		freeRegexCluster(input);
-		return NULL; // failed to open file, so break
+		return;
 	}
 
-	RegexCluster *enrichments = get_cluster_enrichment(input, bound, motif);
+	/* Output enrichments */
+	motif_enrichments(input, bound, opt);
 	
 	freeRegexCluster(input);
 	freeRegexCluster(bound);
-	
-	return enrichments;
 }
 
 
@@ -702,24 +690,84 @@ count_motifs(char *filename, char *pattern)
 
 	/* Make global cluster */
 	RegexCluster *cluster = regexClusterInit(&regex);
+	unsigned int pat_length = 0;
+	for(int i=0; i<cluster->num_kctr; i++) {
+		pat_length += cluster->counters[i]->k_mer;
+	}
 
 	/* Search for matches */
 	Matcher matcher;
-	while(rnaf_oread(read_file, strlen(pattern))) {
+	while(rnaf_oread(read_file, pat_length)) {
 		uint32_t search_index = 0;
 		while(search_index < read_file->buffer_size) {
+			search_index = motif_fileshift(read_file, search_index, pat_length);
+			if(search_index == 100000) break;
 			matcher = regexMatch(&regex, read_file->buffer+search_index);
 			if(!matcher.isFound) { break; }
 
 			/* Process match. Shift buffer by search_index due to search starting from offset*/
-			//process_motif_match(cluster, matcher, read_file->buffer+search_index);
-			search_index += matcher.foundAtIndex+matcher.matchLength;
+			process_motif_match(cluster, matcher, read_file->buffer+search_index,
+			                    read_file->filetype);
+			search_index += matcher.foundAtIndex+1;
 		}
 	}
 	rnaf_close(read_file);
 
 	/* Return cluster */
 	return cluster;
+}
+
+
+uint32_t
+motif_fileshift(RNA_FILE *read_file, uint32_t search_index, unsigned int pat_length)
+{
+	unsigned int shift = search_index;
+	if(read_file->filetype == 'q' && read_file->buffer[shift] == '@') {
+		while(read_file->buffer[shift] != '\n') {
+			shift++;
+			if(read_file->buffer[shift] == '\0') {
+				size_t ret = rnaf_oread(read_file, pat_length);
+				if(ret == 0) return 100000;
+				shift = 0;
+			}
+		}
+	}
+
+	if(read_file->filetype == 'q' && read_file->buffer[shift] == '+') {
+		bool repeat = true;
+		while(read_file->buffer[shift] != '\n' || repeat) {
+			if(read_file->buffer[shift] == '\n') repeat = false;
+			shift++;
+			if(read_file->buffer[shift] == '\0') {
+				size_t ret = rnaf_oread(read_file, pat_length);
+				if(ret == 0) return 100000;
+				shift = 0;
+			}
+		}
+	}
+
+	return shift;
+}
+
+
+void
+process_motif_match(RegexCluster *cluster, Matcher matcher, char *search, char filetype)
+{
+	/* Validate match */
+	int i=matcher.cluster[0].startIndex;
+	while(search[i] != '\0' && search[i++] != '\n');
+	if(filetype == 'q' && (search[i] != '+' || search[i] == '\0')) return;
+	if(filetype == 'a' && (search[i] != '>' || search[i] == '\0')) return;
+	
+	/* Actually process match */
+	for(int cur_kctr=0; cur_kctr<cluster->num_kctr; cur_kctr++) {
+		char *cur_seq = search+matcher.cluster[cur_kctr].startIndex;
+		char *end_seq = cur_seq+matcher.cluster[cur_kctr].clusterLength;
+		char temp = *(end_seq);
+		*(end_seq) = '\0';
+		kctr_increment(cluster->counters[cur_kctr], cur_seq);
+		*(end_seq) = temp;
+	}
 }
 
 /*##########################################################
@@ -773,6 +821,14 @@ compare(const void *a, const void *b)
 	const Enrichments *p1 = (Enrichments *)a;
 	const Enrichments *p2 = (Enrichments *)b;
 
+	if(p1->enrichment == -INFINITY && p2->enrichment == -INFINITY) {
+		return 0;
+	} else if(p1->enrichment == -INFINITY) {
+		return 1;
+	} else if(p2->enrichment == -INFINITY) {
+		return -1;
+	}
+
 	if(p1->enrichment < p2->enrichment) {
 		return 1;
 	} else if(p1->enrichment > p2->enrichment) {
@@ -783,21 +839,35 @@ compare(const void *a, const void *b)
 }
 
 
-void
-enrichments_to_file(KmerCounter *input, KmerCounter *bound, options *opt)
+Enrichments *
+get_enrichments(KmerCounter *input, KmerCounter *bound, bool normalize)
 {
 	unsigned int capacity = input->capacity;
 	Enrichments *enrichments = s_malloc(capacity * sizeof(Enrichments));
 	for(unsigned int i=0; i<capacity; i++) {
+		enrichments[i].key = i;
+		if(input->entries[i] == 0U || bound->entries[i] == 0U) {
+			enrichments[i].enrichment = -INFINITY;
+			continue;
+		}
 		float input_frq = (float)input->entries[i]/input->total_count;
 		float bound_frq = (float)bound->entries[i]/bound->total_count;
 		enrichments[i].enrichment = bound_frq/input_frq;
-		if(!opt->no_log) enrichments[i].enrichment = log2f(enrichments[i].enrichment);
-		enrichments[i].key = i;
+		if(normalize) enrichments[i].enrichment = log2f(enrichments[i].enrichment);
 	}
-
 	qsort(enrichments, capacity, sizeof(Enrichments), compare);
-	for(unsigned int i=0; i<capacity; i++) {
+	return enrichments;
+}
+
+
+void
+enrichments_to_file(KmerCounter *input, KmerCounter *bound, options *opt)
+{
+	Enrichments *enrichments = get_enrichments(input, bound, !opt->no_log);
+	for(unsigned int i=0; i<input->capacity; i++) {
+		if(enrichments[i].enrichment == -INFINITY) {
+			continue;
+		}
 		char kseq[17];
 		kctr_get_key(input, kseq, enrichments[i].key);
 		fprintf(opt->out_file, "%s%c%f\n", kseq, opt->file_delimiter, enrichments[i].enrichment);
@@ -819,10 +889,12 @@ penrichments_to_file(IndependentProbCounts *counts, options *opt)
 		float kmer_frq = (float)counts->kmers->entries[i]/counts->kmers->total_count;
 		float predicted_frq = (float)predict_kmer(kseq, counts->monomers, counts->dimers);
 
-		/* if input_frq is 0, then div by 0 error would occur so skip */
-		// if(predicted_frq == 0) {
-		// 	continue;
-		// }
+		/* if counts is 0, then div by 0 error would occur so skip */
+		if(counts->kmers->entries[i] == 0 || 
+		   counts->dimers->entries[i] == 0 || 
+		   counts->monomers->entries[i] == 0) {
+			continue;
+		}
 
 		/* Get enrichment of current k-mer */
 		float cur_enrichment = kmer_frq/predicted_frq;
@@ -842,6 +914,58 @@ penrichments_to_file(IndependentProbCounts *counts, options *opt)
 		fprintf(opt->out_file, "%s%c%f\n", kseq, opt->file_delimiter, enrichments[i].enrichment);
 	}
 
+	free(enrichments);
+}
+
+
+void
+motif_enrichments(RegexCluster *input, RegexCluster *bound, options *opt)
+{
+	/* Prepare pointer that points to all bin enrichments */
+	Enrichments **enrichments = s_malloc(input->num_kctr * sizeof(Enrichments));
+	uint8_t num_kctr = input->num_kctr;
+
+	/* Print header to file & calculate enrichments for all bins */
+	const char sep = opt->file_delimiter;
+	for(int cur_kctr=0; cur_kctr<num_kctr; cur_kctr++) {
+		enrichments[cur_kctr] = get_enrichments(
+		                           input->counters[cur_kctr],
+		                           bound->counters[cur_kctr], 
+		                           !opt->no_log);
+
+		/* Print header to file */
+		fprintf(opt->out_file, "kmer_%d%crval_%d", cur_kctr+1, sep, cur_kctr+1);
+		if((cur_kctr+1)!=num_kctr) fprintf(opt->out_file, "%c", sep);
+	}
+	fprintf(opt->out_file, "\n");
+
+	/* Get maximum capacity to loop from */
+	unsigned int max_capacity=0;
+	for(int i=0; i<num_kctr; i++) {
+		if(max_capacity < input->counters[i]->capacity) {
+			max_capacity = input->counters[i]->capacity;
+		}
+	}
+
+	/* Output enrichments to file */
+	char kseq[17];
+	for(unsigned int k=0; k<max_capacity; k++) {
+		for(uint8_t i=0; i<num_kctr; i++) {
+			if(enrichments[i][k].enrichment == -INFINITY || k>=input->counters[i]->capacity) {
+				fprintf(opt->out_file, "%c", sep);
+			} else {
+				kctr_get_key(input->counters[i], kseq, enrichments[i][k].key);
+				fprintf(opt->out_file, "%s%c%f",kseq,sep,enrichments[i][k].enrichment);
+			}
+			if((i+1)!=num_kctr) fprintf(opt->out_file, "%c", sep);
+		}
+		fprintf(opt->out_file, "\n");
+	}
+
+	/* Free up data */
+	for(uint8_t i=0; i<num_kctr; i++) {
+		free(enrichments[i]);
+	}
 	free(enrichments);
 }
 
