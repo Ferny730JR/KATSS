@@ -43,6 +43,9 @@ add_executable(aspiire
 	src/parallel_helpers.c
 	src/c_thread_pool/thpool.c)
 
+# Set C standard
+set_property(TARGET SKA PROPERTY C_STANDARD 11)
+
 # Include directories for SKA
 target_include_directories(SKA PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(SKA ZLIB::ZLIB)
