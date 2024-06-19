@@ -236,6 +236,10 @@ rnaf_destroy(RnaInfo *rna_info)
 size_t 
 rnaf_oread(RNA_FILE *rna_file, unsigned int offset)
 {
+	if(gzeof(rna_file->file)) {
+		return (size_t)0;
+	}
+
 	for(unsigned int i=0; i<offset; i++) {
 		unsigned int indx = rna_file->buffer_size-(offset-i);
 		rna_file->buffer[i] = rna_file->buffer[indx];
