@@ -5,4 +5,6 @@ set(KKCTR_VERBOSE ON CACHE BOOL "Output error/warning messages to stderr")
 # build modules
 add_subdirectory(helpers)
 add_subdirectory(KmerCounter)
-add_subdirectory(Structure)
+if(NOT SKIP_INSTALL_KSTRUCT)
+	add_subdirectory(Structure)
+endif()

@@ -47,6 +47,8 @@ option(SKIP_INSTALL_LIBRARIES "Don't install shared and static libraries" OFF)
 option(SKIP_INSTALL_STATIC "Don't install static library" OFF)
 option(SKIP_INSTALL_SHARED "Don't install shared library" OFF)
 option(SKIP_INSTALL_HEADER "Don't install header files" OFF)
+option(SKIP_INSTALL_KSTRUCT "Don't install kstruct binary" OFF)
+option(SKIP_INSTALL_IKKE "Don't install ikke binary" OFF)
 
 set(CMAKE_C_FLAGS_DEBUG "-O0 -ggdb3")
 add_subdirectory(source)
@@ -54,8 +56,14 @@ add_subdirectory(source)
 # Install rules
 if(NOT SKIP_INSTALL_ALL)
 	if(NOT SKIP_INSTALL_BINARIES)
-		install(TARGETS ikke
-		        RUNTIME DESTINATION "${INSTALL_BIN_DIR}")
+		if(NOT SKIP_INSTALL_IKKE)
+			install(TARGETS ikke
+			        RUNTIME DESTINATION "${INSTALL_BIN_DIR}")
+		endif()
+		if(NOT SKIP_INSTALL_KSTRUCT)
+			install(TARGETS kstruct
+			        RUNTIME DESTINATION "{INSTALL_BIN_DIR}")
+		endif()
 	endif()
 
 	if(NOT SKIP_INSTALL_LIBRARIES)

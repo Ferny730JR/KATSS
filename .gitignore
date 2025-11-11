@@ -5,4 +5,10 @@
 .DS_Store
 
 # Ignore cmake build files
-build/
+build*/
+
+# Ignore packaging files
+packaging/
+
+# Ignore .clangd configuration file
+.clangd
