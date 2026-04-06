@@ -1,6 +1,7 @@
 #ifndef STRING_UTILS_H
 #define STRING_UTILS_H
 
+#include <stddef.h>
 
 /**
  *  @brief Returns a substring of sequence that is length-characters long starting at 
