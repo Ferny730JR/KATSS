@@ -59,24 +59,23 @@ katss_init_hasher(unsigned int kmer, char filetype)
 	hasher->mask = ((1ULL << 2*kmer) - 1);
 	hasher->end_of_seq = false;
 	hasher->kmer = kmer;
+	hasher->filetype = filetype;
 	hasher->sequence = NULL;
 	hasher->endno = 0;
 	hasher->has_previous = false;
 	hasher->previous_hash = 0;
 	hasher->pos = 0;
-	(void)filetype; // silence compiler warnings.
 	return hasher;
 }
 
 
 void
-katss_set_seq(KatssHasher *hasher, char *sequence, char filetype)
+katss_set_seq(KatssHasher *hasher, char *sequence)
 {
 	hasher->sequence = (unsigned char *)sequence;
 	hasher->end_of_seq = false;
 	handle_endno(hasher);
 	hasher->endno = 0;
-	(void)filetype; // silence compiler warnings. todo: fix this
 }
 
 
@@ -130,19 +129,20 @@ handle_endno(KatssHasher *hasher)
 | Forward-Strand Hashing Functions                |
 =================================================*/
 
-/* Get the forward hash of specified filetype */
+/* Get the forward hash */
 bool
-katss_get_fh(KatssHasher *hasher, uint32_t *hash, char filetype)
+katss_get_fh(KatssHasher *hasher, uint32_t *hash)
 {
 	/* If int pointer is NULL, can't modify it so return false */
 	if(hash == NULL) {
 		return false;
 	}
+	char filetype = hasher->filetype;
 
 	/* No previous hash to build off of, get new hash from observed */
 	if(!hasher->has_previous) {
 		switch(filetype) {
-		case 'r': *hash = fbh_r(hasher); break;
+		case 's': *hash = fbh_r(hasher); break;
 		case 'a': *hash = fbh_a(hasher); break;
 		case 'q': *hash = fbh_q(hasher); break;
 		default: error_message("Filetype '%c' currently not supported.", filetype); break;
@@ -155,7 +155,7 @@ katss_get_fh(KatssHasher *hasher, uint32_t *hash, char filetype)
 	}
 
 	/* Skip newline characters. Save time & necessary for multiline fasta */
-	if(filetype != 'r' && *hasher->sequence == '\n') ++hasher->sequence;
+	if(filetype != 's' && *hasher->sequence == '\n') ++hasher->sequence;
 
 	/* Begin actual hash computations */
 	uint32_t x = base[*hasher->sequence];
@@ -164,7 +164,7 @@ katss_get_fh(KatssHasher *hasher, uint32_t *hash, char filetype)
 		++hasher->sequence;
 	} else if(x > 4) {
 		switch(filetype) {
-		case 'r': *hash = fbh_r(hasher); break;
+		case 's': *hash = fbh_r(hasher); break;
 		case 'a': *hash = fbh_a(hasher); break;
 		case 'q': *hash = fbh_q(hasher); break;
 		default: error_message("Filetype '%c' currently not supported.", filetype); break;

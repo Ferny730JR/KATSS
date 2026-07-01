@@ -19,7 +19,7 @@ typedef struct KatssHasher KatssHasher;
  * 
  * @param kmer     k-mers lengths you want to look for
  * @param filetype Type of file the new sequence was obtained from . `a` for fasta files. `q` for
- * fastq files. `r` for raw sequences.
+ * fastq files. `s` for raw sequences.
  * @return KatssHasher* 
  */
 KatssHasher *katss_init_hasher(unsigned int kmer, char filetype);
@@ -33,10 +33,9 @@ KatssHasher *katss_init_hasher(unsigned int kmer, char filetype);
  * 
  * @param hasher   Pointer to the KmerHasher struct you want to 'feed'
  * @param sequence New sequence to replace the current one in the provided KmerHasher
- * @param filetype The type of file the new sequence was obtained from. `a` for fasta files. `q`
  * for fastq files. `r` for raw sequences.
  */
-void katss_set_seq(KatssHasher *hasher, char *sequence, char filetype);
+void katss_set_seq(KatssHasher *hasher, char *sequence);
 
 
 /**
@@ -46,11 +45,10 @@ void katss_set_seq(KatssHasher *hasher, char *sequence, char filetype);
  * 
  * @param hasher    KmerHasher struct that contains the sequence information.
  * @param hash      Pointer that will contain the next hash
- * @param filetype  Type of file you are hashing from
  * @return true if `hash` was set successfully
  * @return false if `hash` there are no more hashes left
  */
-bool katss_get_fh(KatssHasher *hasher, uint32_t *hash, char filetype);
+bool katss_get_fh(KatssHasher *hasher, uint32_t *hash);
 
 
 /**

@@ -37,6 +37,7 @@ struct KatssCounter {
 struct KatssHasher {
 	unsigned char *sequence;      /** Sequence that is being processed */
 	unsigned int kmer;            /** K-mer size to hash */
+	char filetype;                /** Filetype to hash */
 	bool end_of_seq;              /** If hasher has finished hashing the sequence */
 	uint32_t mask;                /** 32-bit mask for specified k-mer length */
 	uint32_t previous_hash;       /** Previous calculated hash. Used for rolling hash */
