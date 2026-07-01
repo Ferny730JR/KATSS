@@ -31,16 +31,24 @@
 extern "C" {
 #endif
 
-#define SEQF_VERSION "0.1.0"
+#define SEQF_VERSION        "0.1.0"
 #define SEQF_VERSION_NUMBER 0x00001000U
-#define SEQF_VERSION_MAJOR 0
-#define SEQF_VERSION_MINOR 1
-#define SEQF_VERSION_PATCH 0
+#define SEQF_VERSION_MAJOR  0
+#define SEQF_VERSION_MINOR  1
+#define SEQF_VERSION_PATCH  0
 
 #define SEQFBUFSIZ 8192
 #ifndef EOF
-#define EOF (-1)
+#	define EOF (-1)
 #endif
+
+#define SEQF_E_ERRNO  1 // Error produced by <errno.h>
+#define SEQF_E_INVALM 2 // Invalid mode used in seqfile
+#define SEQF_E_INVALT 3 // Invalid file type used in seqfile
+#define SEQF_E_OOM    4 // Out of memory
+#define SEQF_E_MUTEX  5 // Mutex error
+#define SEQF_E_EMPTY  6 // File is empty, cannot determine type
+#define SEQF_E_UNKNT  7 // Cannot determine file type from contents
 
 /**
  * @brief Get the error number encountered by SeqFile
@@ -122,6 +130,47 @@ bool seqfeof(SeqFile file);
 
 
 /**
+ * @brief Update the filetype of the seqfile handle
+ *
+ * Can be updated to one of 4 file formats:
+ *   'a': fasta file format
+ *
+ *   'q': fastq file format
+ *
+ *   's': sequences file format
+ *
+ *   'b': binary file format
+ * 
+ * @param file     SeqFile handle to update the file type
+ * @param filetype 'a' | 'q' | 's' | 'b'
+ * @return int 0 on success, 1 on error
+ */
+int seqfsettype(SeqFile file, char filetype);
+
+
+/**
+ * @brief Get the type of file 
+ *
+ * SeqFile currently has 4 supported file types:
+ *   'a': fasta file format
+ *   'q': fastq file format
+ *   's': sequences file format
+ *   'b': binary file format
+ *
+ * Fasta and fastq file format follow standard bioinformatics format.
+ *
+ * Sequendes are just the raw sequences with no other information. In other words,
+ * one sequence per file.
+ *
+ * Binary file format is equivalent to the `<stdio.h>` file handling.
+ * 
+ * @param file  SeqFile handle to check its current file type
+ * @return unsigned char The file type of the SeqFile handle
+ */
+unsigned char seqftype(SeqFile file);
+
+
+/**
  * @brief Set the input buffer of the SeqFile handle
  * 
  * The input buffer is only ever used if the file is in a compressed file
@@ -132,8 +181,7 @@ bool seqfeof(SeqFile file);
  * @param bufsize New size of the input buffer
  * @return int 0 on success, -1 when not enough memory was available
  */
-int
-seqfsetibuf(SeqFile file, size_t bufsize);
+int seqfsetibuf(SeqFile file, size_t bufsize);
 
 
 /**
@@ -143,8 +191,7 @@ seqfsetibuf(SeqFile file, size_t bufsize);
  * @param bufsize New size of the output buffer
  * @return int 
  */
-int
-seqfsetobuf(SeqFile file, size_t bufsize);
+int seqfsetobuf(SeqFile file, size_t bufsize);
 
 
 /**
@@ -161,8 +208,7 @@ seqfsetobuf(SeqFile file, size_t bufsize);
  * @return int 0 on success. -1 when failed to set input buffer, -2 when failed
  * to set output buffer.
  */
-int
-seqfsetbuf(SeqFile file, size_t bufsize);
+int seqfsetbuf(SeqFile file, size_t bufsize);
 
 
 /**

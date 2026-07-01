@@ -13,19 +13,6 @@ endif()
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-include(CheckIncludeFile)
-CHECK_INCLUDE_FILE(threads.h HAVE_C11_THREADS)
-if(NOT HAVE_C11_THREADS)
-	set(THREAD_LIB tinycthread)
-	if(WIN32)
-		set(C11_THREADS_DEFINE "__STDC_NO_THREADS__=1")
-	endif()
-else()
-	find_package(Threads REQUIRED)
-	set(THREAD_LIB Threads::Threads)
-	set(NO_C11_THREADS_DEFINE "")
-endif()
-
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_is_supported OUTPUT ipo_error)
 if(ipo_is_supported)
@@ -49,10 +36,30 @@ option(SEQF_SKIP_INSTALL_SHARED "Don't install shared library" OFF)
 option(SEQF_SKIP_INSTALL_HEADER "Don't install header files" OFF)
 
 # Find compression library
-set(SEQF_HAS_ISA_L FALSE)
-find_package(ZLIB REQUIRED)
-set(COMPRESSION_LIB ZLIB::ZLIB)
-set(COMPRESSION_INC "")
+message(CHECK_START "Finding ISA-L")
+find_library(COMPRESSION_LIB
+	NAMES isal
+	PATHS "/usr/lib"
+	      "/usr/lib64"
+	      "/usr/local/lib"
+	      "/usr/local/lib64"
+	      "$ENV{HOME}/.local/lib"
+	      "$ENV{HOME}/.local/lib64")
+find_path(COMPRESSION_INC
+	NAMES igzip_lib.h
+	PATHS "$ENV{HOME}/.local/include"
+	      "/usr/include"
+	      "/usr/local/include")
+if(COMPRESSION_LIB AND COMPRESSION_INC)
+	set(SEQF_HAS_ISA_L TRUE)
+	message(CHECK_PASS "found: " ${COMPRESSION_LIB})
+else()
+	set(SEQF_HAS_ISA_L FALSE)
+	message(CHECK_FAIL "not found, attempting ZLIB...")
+	find_package(ZLIB REQUIRED)
+	set(COMPRESSION_LIB ZLIB::ZLIB)
+	set(COMPRESSION_INC "")
+endif()
 
 set(CMAKE_C_FLAGS_DEBUG "-O0 -ggdb3 -Wall -Werror -Wpedantic")
 

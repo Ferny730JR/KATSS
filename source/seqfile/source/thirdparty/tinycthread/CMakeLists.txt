@@ -1,0 +1,3 @@
+add_library(seqf_tinycthread OBJECT tinycthread.c)
+set_target_properties(seqf_tinycthread PROPERTIES
+	POSITION_INDEPENDENT_CODE ON)

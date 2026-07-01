@@ -1,3 +1,5 @@
+add_subdirectory(thirdparty)
+
 set(SEQF_SRCS
     seqflib.c
     seqferrno.c
@@ -15,15 +17,21 @@ set(SEQF_PRIVATE_HEADERS
 # Create shared library
 if(SEQF_BUILD_SHARED)
 	add_library(seqf_shared SHARED ${SEQF_SRCS})
+	if(TARGET seqf_tinycthread)
+		target_sources(seqf_shared PRIVATE $<TARGET_OBJECTS:seqf_tinycthread>)
+		target_include_directories(seqf_shared PRIVATE
+			${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/tinycthread)
+	endif()
 	target_include_directories(seqf_shared PUBLIC
 		${CMAKE_CURRENT_SOURCE_DIR} ${SEQF_INCLUDE_DIR} ${COMPRESSION_INC})
 
 	target_link_libraries(seqf_shared PUBLIC
-		${THREAD_LIB} ${COMPRESSION_LIB})
+		${COMPRESSION_LIB})
+	target_link_libraries(seqf_shared PRIVATE
+		seqf_thread_config)
 
 	target_compile_definitions(seqf_shared PRIVATE
-		_HAS_ISA_L_=$<BOOL:${KATSS_HAS_ISA_L}>
-		${C11_THREADS_DEFINE})
+		_HAS_ISA_L_=$<BOOL:${SEQF_HAS_ISA_L}>)
 
 	set_target_properties(seqf_shared PROPERTIES
 		POSITION_INDEPENDENT_CODE ON
@@ -39,18 +47,24 @@ endif(SEQF_BUILD_SHARED)
 # Create static library
 if(SEQF_BUILD_STATIC)
 	add_library(seqf_static STATIC ${SEQF_SRCS})
+	if(TARGET seqf_tinycthread)
+		target_sources(seqf_static PRIVATE $<TARGET_OBJECTS:seqf_tinycthread>)
+		target_include_directories(seqf_static PRIVATE
+			${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/tinycthread)
+	endif()
 
 	target_include_directories(seqf_static PUBLIC
 		${CMAKE_CURRENT_SOURCE_DIR} ${SEQF_INCLUDE_DIR} ${COMPRESSION_INC})
 
 	target_link_libraries(seqf_static PUBLIC
-		${THREAD_LIB} ${COMPRESSION_LIB})
+		${COMPRESSION_LIB})
+	target_link_libraries(seqf_static PRIVATE
+		seqf_thread_config)
 
 	target_compile_definitions(seqf_static PRIVATE
-		_HAS_ISA_L_=$<BOOL:${KATSS_HAS_ISA_L}>
-		${C11_THREADS_DEFINE})
+		_HAS_ISA_L_=$<BOOL:${SEQF_HAS_ISA_L}>)
 
-	if(WIN32 AND MSVC)
+	if(WIN32)
 		set_target_properties(seqf_static PROPERTIES
 			VERSION ${PROJECT_VERSION}
 			OUTPUT_NAME seqf_static)
