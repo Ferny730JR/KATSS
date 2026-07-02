@@ -327,7 +327,7 @@ test_determine_type(void)
 }
 
 static void
-all_tests()
+all_tests(void)
 {
 	init_run_test;
 

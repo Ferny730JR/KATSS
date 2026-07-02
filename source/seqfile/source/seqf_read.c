@@ -39,7 +39,7 @@ static int
 seqf_loadp(seqf_statep state, unsigned char *buffer, size_t bufsize, size_t *nread)
 {
 	size_t left = bufsize;
-	ssize_t n;
+	ssize_t n = 0;
 	*nread = 0;
 	if(left) do {
 		n = read(state->fd, buffer, left);
