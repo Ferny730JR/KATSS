@@ -16,13 +16,13 @@
 static inline bool
 seen_test_and_set(uint8_t *seen, uint32_t hash)
 {
-    uint8_t *byte = &seen[hash >> 3];
-    uint8_t mask = (uint8_t)(UINT8_C(1) << (hash & 7U));
+	uint8_t *byte = &seen[hash >> 3];
+	uint8_t mask = (uint8_t)(UINT8_C(1) << (hash & 7U));
 
-    bool already_seen = (*byte & mask) != 0;
-    *byte |= mask;
+	bool already_seen = (*byte & mask) != 0;
+	*byte |= mask;
 
-    return already_seen;
+	return already_seen;
 }
 
 
@@ -219,6 +219,106 @@ cleanup_hasher:
 	free(hasher);
 cleanup_file:
 	seqfclose(file);
+exit:
+	free(buffer);
+	free(shuf);
+	return counter;
+}
+
+
+KatssCounter *
+katss_count_presence_ushuffle_bootstrap(
+	const char *filename,
+	unsigned int kmer,
+	int klet,
+	int sample,
+	unsigned int *seed
+)
+{
+	/* sample should be between 1-100000 */
+	sample = MAX2(sample, 1);
+	sample = MIN2(sample, 100000);
+
+	/* If not subsampling, just do regular ushuffle */
+	if(sample == 100000)
+		return katss_count_presence_ushuffle(filename, kmer, klet);
+
+	/* Check klet */
+	if(klet < 1)
+		return NULL;
+	KatssCounter *counter = NULL;
+
+	/* Initialize buffer */
+	char *buffer = s_calloc(BUFFER_SIZE, sizeof *buffer);
+	char *shuf   = s_calloc(BUFFER_SIZE, sizeof *shuf);
+	uint32_t hash_value;
+
+	/* Open file and hasher */
+	SeqFile read_file = seqfopen(filename, "r");
+	if(read_file == NULL) {
+		error_message("%s", seqfstrerror(seqferrno));
+		goto exit;
+	}
+	
+	KatssHasher *hasher = katss_init_hasher(kmer, 's');
+	if(hasher == NULL) {
+		error_message("Failed to initialize hasher");
+		goto cleanup_file;
+	}
+	
+	counter = katss_init_counter(kmer);
+	if(counter == NULL) {
+		error_message("Failed to initialize counter");
+		goto cleanup_hasher;
+	}
+
+	/* int to subsample from rand() */
+	unsigned int local_seed;
+	if(seed == NULL) {
+		local_seed = time(NULL);
+		seed = &local_seed;
+	}
+
+	/* Allocate seen set */
+	size_t seen_size = (((size_t)counter->capacity) + 1) / 8;
+	uint8_t *seen = s_malloc(seen_size * sizeof *seen);
+
+	srand(1); // reset rand seed for shuffle
+	while(seqfgets_unlocked(read_file, buffer, BUFFER_SIZE)) {
+		/* Pick random sequences */
+		if(rand_r(seed) % 100000 >= sample)
+			continue;
+
+		/* Shuffle sequences */
+		int seqlen = strlen(buffer);
+		shuffle(buffer, shuf, strlen(buffer), klet);
+		shuf[seqlen] = '\0'; // add null terminator since shuffle uses strncpy
+
+		/* Add shuffled sequence to hasher */
+		hasher->has_previous = false;
+		katss_set_seq(hasher, shuf);
+
+		/* Reset the seen set */
+		memset(seen, 0, seen_size);
+
+		/* Count presence of k-mers in shuffled sequence */
+		while(katss_get_fh(hasher, &hash_value)) {
+			if(seen_test_and_set(seen, hash_value))
+				continue;
+			katss_increment(counter, hash_value);
+		}
+	}
+
+	if(seqferrno) {
+		error_message("katss: sample: %s\n", seqfstrerror_r(seqferrno, buffer, BUFFER_SIZE));
+		katss_free_counter(counter);
+		counter = NULL;
+	}
+
+cleanup_hasher:
+	free(hasher);
+cleanup_file:
+	seqfclose(read_file);
 exit:
 	free(buffer);
 	free(shuf);
