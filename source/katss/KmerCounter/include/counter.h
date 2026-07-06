@@ -1,6 +1,7 @@
 #ifndef KATSS_COUNTER_H
 #define KATSS_COUNTER_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -306,6 +307,72 @@ int katss_uncount_kmer(KatssCounter *counter, const char *filename, const char *
  * @return int 
  */
 int katss_uncount_kmer_mt(KatssCounter *counter, const char *filename, const char *kmer, int threads);
+
+
+/**
+ * @brief Count how many sequences contain each k-mer.
+ *
+ * Since k-mers can be repeated multiple times in a single sequence, only
+ * increments the count of a given k-mer once per sequence. In other words, it
+ * is counting the number of sequences a given k-mer is present in.
+ * 
+ * @param filename Name of the file to count k-mer presence in
+ * @param kmer     Length of k-mer to count
+ * @return KatssCounter* 
+ */
+KatssCounter *katss_count_presence(const char *filename, unsigned int kmer);
+
+
+/**
+ * @brief Count how many sub-sampled sequences contain each k-mer
+ * 
+ * @param filename Name of the file to count k-mer presence in
+ * @param kmer     Length of k-mer to count
+ * @param sample   Percent to sample. Should be between 1 and 100,000
+ * @param seed     Seed to use for random sample. Use NULL for a random seed.
+ * @return KatssCounter* 
+ */
+KatssCounter *
+katss_count_presence_bootstrap(
+	const char   *filename,
+	unsigned int  kmer,
+	int           sample,
+	unsigned int *seed
+);
+
+
+/**
+ * @brief Count how many sequences contain each k-mer
+ *
+ * See `katss_count_presence`. This function is the same, with the difference
+ * being that sequences are first shuffled through `ushuffle` before testing
+ * for presence of k-mers within the sequence.
+ * 
+ * @param filename Name of the file to count k-mer presence in
+ * @param kmer     Length of k-mer to count
+ * @param klet     Length of k-let to preserve in sequence
+ * @return KatssCounter* 
+ */
+KatssCounter *katss_count_presence_ushuffle(const char *filename, unsigned int kmer, int klet);
+
+
+/**
+ * @brief Count how many sub-sampled shuffled sequences contain each k-mer
+ * 
+ * @param filename Name of file to count k-mer presence in
+ * @param kmer     Length of k-mer to count
+ * @param klet     Length of k-let to preserve in sequence
+ * @param sample   Percent to sub-sample. Should be between 1 and 100,000
+ * @param seed     Seed to use for random sampling. Use NULL for a random seed
+ * @return KatssCounter* 
+ */
+KatssCounter *katss_count_presence_ushuffle_bootstrap(
+	const char *filename,
+	unsigned int kmer,
+	int klet,
+	int sample,
+	unsigned int *seed
+);
 
 #ifdef __cplusplus
 }
