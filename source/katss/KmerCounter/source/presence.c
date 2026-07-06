@@ -29,8 +29,6 @@ seen_test_and_set(uint8_t *seen, uint32_t hash)
 KatssCounter *
 katss_count_presence(const char *filename, unsigned int kmer)
 {
-	warning_message("in count overlaps...");
-
 	KatssCounter *counter = katss_init_counter(kmer);
 	if(counter == NULL) {
 		return NULL;
@@ -74,6 +72,86 @@ katss_count_presence(const char *filename, unsigned int kmer)
 	free(buffer);
 	free(hasher);
 	seqfclose(file);
+	return counter;
+}
+
+
+KatssCounter *
+katss_count_presence_bootstrap(const char *filename, unsigned int kmer,
+                               int sample, unsigned int *seed)
+{
+	KatssCounter *counter = NULL;
+
+	/* Open file for reading */
+	SeqFile read_file = seqfopen(filename, "r");
+	if(read_file == NULL) {
+		error_message("%s", seqfstrerror(seqferrno));
+		goto exit;
+	}
+
+	/* Hasher in sequences mode since we are using `seqfgets` */
+	KatssHasher *hasher = katss_init_hasher(kmer, 's');
+	if(hasher == NULL) {
+		error_message("Failed to initialize the hasher");
+		goto cleanup_file;
+	}
+
+	/* Initialize counter */
+	counter = katss_init_counter(kmer);
+	if(counter == NULL) {
+		error_message("Failed to initialize the counter");
+		goto cleanup_hasher;
+	}
+
+	/* Allocate seen set and buffer */
+	size_t seen_size = (((size_t)counter->capacity) + 1) / 8;
+	uint8_t *seen = s_malloc(seen_size * sizeof *seen);
+	char *buffer  = s_calloc(BUFFER_SIZE, sizeof *buffer);
+	uint32_t hash_value;
+
+	/* sample should be between 1-100000 */
+	sample = MAX2(sample, 1);
+	sample = MIN2(sample, 100000);
+
+	unsigned int local_seed;
+	if(seed == NULL) {
+		local_seed = time(NULL);
+		seed = &local_seed;
+	}
+
+	while(seqfgets_unlocked(read_file, buffer, BUFFER_SIZE)) {
+		/* Determine if we use this sequence */
+		if(rand_r(seed) % 100000 >= sample)
+			continue;
+
+		/* Put sequence into the hasher */
+		hasher->has_previous = false;
+		katss_set_seq(hasher, buffer);
+
+		/* Reset the seen set */
+		memset(seen, 0, seen_size);
+
+		/* Count the presence of k-mers */
+		while(katss_get_fh(hasher, &hash_value)) {
+			if(seen_test_and_set(seen, hash_value))
+				continue;
+			katss_increment(counter, hash_value);
+		}
+	}
+
+	if(seqferrno) {
+		error_message("katss: sample: %s\n", seqfstrerror_r(seqferrno, buffer, BUFFER_SIZE));
+		katss_free_counter(counter);
+		counter = NULL;
+	}
+
+	free(seen);
+	free(buffer);
+cleanup_hasher:
+	free(hasher);
+cleanup_file:
+	seqfclose(read_file);
+exit:
 	return counter;
 }
 
@@ -136,12 +214,12 @@ katss_count_presence_ushuffle(const char *filename, unsigned int kmer, int klet)
 		}
 	}
 
+	free(seen);
 cleanup_hasher:
 	free(hasher);
 cleanup_file:
 	seqfclose(file);
 exit:
-	free(seen);
 	free(buffer);
 	free(shuf);
 	return counter;
