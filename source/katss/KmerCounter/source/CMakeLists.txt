@@ -6,12 +6,14 @@ set(KATSS_SOURCE_FILES
 	"${CMAKE_CURRENT_SOURCE_DIR}/counter.c"
 	"${CMAKE_CURRENT_SOURCE_DIR}/recounter.c"
 	"${CMAKE_CURRENT_SOURCE_DIR}/uncounter.c"
+	"${CMAKE_CURRENT_SOURCE_DIR}/presence.c"
 	"${CMAKE_CURRENT_SOURCE_DIR}/enrichments.c"
 	"${CMAKE_CURRENT_SOURCE_DIR}/ushuffle.c"
 	"${CMAKE_CURRENT_SOURCE_DIR}/katss_helpers.c"
 	"${CMAKE_CURRENT_SOURCE_DIR}/katss_count.c"
 	"${CMAKE_CURRENT_SOURCE_DIR}/katss_enrichment.c"
 	"${CMAKE_CURRENT_SOURCE_DIR}/katss_ikke.c"
+	"${CMAKE_CURRENT_SOURCE_DIR}/katss_presence.c"
 	"${CMAKE_CURRENT_SOURCE_DIR}/thread_safe_rand.c"
 	)
 

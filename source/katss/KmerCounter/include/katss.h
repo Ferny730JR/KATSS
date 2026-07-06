@@ -88,7 +88,7 @@ katss_init_options(KatssOptions *opts);
 /**
  * @brief Count all kmers in a dataset
  * 
- * @param path File path to the dataset that will be counter. Can be either a
+ * @param path File path to the dataset that will be counted. Can be either a
  * fasta, fastq, or reads file format. Work with files that are gzip compressed.
  * @param opts Options struct to modify the counting algorithm
  * @return KatssData* 
@@ -122,6 +122,19 @@ katss_enrichment(const char *test, const char *ctrl, KatssOptions *opts);
  */
 KatssData *
 katss_ikke(const char *test, const char *ctrl, KatssOptions *opts);
+
+
+/**
+ * @brief Count the number of sequences a given k-mer is present in.
+ * 
+ * @param path File path to the dataset that will count the present k-mers. Can
+ * be either fasta, fastq, or reads file format. Works with gzip compressed
+ * files.
+ * @param opts Options struct to modify the parameters
+ * @return KatssData* 
+ */
+KatssData *
+katss_presence(const char *path, KatssOptions *opts);
 
 
 /**
