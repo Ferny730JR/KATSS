@@ -23,6 +23,7 @@ typedef struct Options {
 	bool no_log;        /** Don't normalize outputs to log2 */
 
 	bool enrichments;   /** Compute regular enrichments */
+	bool presence;      /** Compute the k-mer presence */
 	bool shuffle;       /** Shuffle the sequences */
 	int  klet;          /** Length of k-let to preserve during shuffling */
 	bool probabilistic; /** Enable probabilistic enrichments */
@@ -58,6 +59,7 @@ init_default_options(Options *opt)
 	opt->no_log     = false;
 
 	opt->enrichments   = false;
+	opt->presence      = false;
 	opt->probabilistic = false;
 	opt->bootstrap     = false;
 	opt->bs_runs       = 10;
@@ -76,7 +78,7 @@ main(int argc, char *argv[])
 	/* Parse command line options */
 	if(ikke_cmdline_parser(argc, argv, &args_info) != 0)
 		goto exit_error;
-	
+
 	if(!args_info.test_given && !args_info.control_given) {
 		printf("ikke -c [control.fastq.gz] -t [test.fastq.gz] [OPTIONS]\n");
 		printf("Try 'ikke --help' for more information.\n");
@@ -110,6 +112,7 @@ main(int argc, char *argv[])
 	opt.shuffle       = (bool)args_info.shuffle_flag;
 	opt.no_log        = (bool)args_info.no_log_flag;
 	opt.enrichments   = (bool)args_info.enrichments_flag;
+	opt.presence      = (bool)args_info.presence_flag;
 	opt.probabilistic = (bool)args_info.independent_probs_flag;
 
 	/* Make sure options were set correctly */
@@ -119,13 +122,22 @@ main(int argc, char *argv[])
 		goto cleanup_args;
 	}
 
-	if(opt.ctrl_file == NULL && !opt.probabilistic && !opt.shuffle) {
+	if(opt.ctrl_file == NULL && !opt.probabilistic && !opt.shuffle && !opt.presence) {
 		error_message("You need to provide a control file");
 		goto cleanup_args;
 	}
 
+	if(opt.presence && opt.enrichments) {
+		error_message("Algorithm options 'presence' and 'enrichments'"
+		              "are mutually exclusive. Enable only one.");
+		goto cleanup_args;
+	}
+
+	if(opt.presence && opt.ctrl_file != NULL)
+		warning_message("Ignoring control file: `%s'", opt.ctrl_file);
+
 	if(opt.probabilistic && opt.ctrl_file != NULL)
-		warning_message("Ignoring control file: %s", opt.ctrl_file);
+		warning_message("Ignoring control file: `%s'", opt.ctrl_file);
 
 	if(opt.iterations < 1) {
 		warning_message("Iterations can not be below 1. Defaulting to 1.");
@@ -180,6 +192,8 @@ main(int argc, char *argv[])
 	KatssData *data = NULL;
 	if(opt.enrichments) {
 		data = katss_enrichment(opt.test_file, opt.ctrl_file, &katss_opts);
+	} else if(opt.presence) {
+		data = katss_presence(opt.test_file, &katss_opts);
 	} else {
 		data = katss_ikke(opt.test_file, opt.ctrl_file, &katss_opts);
 	}
@@ -262,9 +276,14 @@ void
 katssdata_to_file(KatssData *data, Options *opt)
 {
 	/* Print the header */
-	if(opt->bootstrap) {
+	if(opt->bootstrap && !opt->presence) {
 		fprintf(opt->out_file, "kmer%crval%cstdev%cpval\n",
 		  opt->delimiter, opt->delimiter, opt->delimiter);
+	} else if(opt->bootstrap && opt->presence) {
+		fprintf(opt->out_file, "kmer%ccount%cstdev\n",
+		  opt->delimiter, opt->delimiter);
+	} else if(opt->presence) {
+		fprintf(opt->out_file, "kmer%ccount\n", opt->delimiter);
 	} else {
 		fprintf(opt->out_file, "kmer%crval\n",opt->delimiter);
 	}
@@ -272,13 +291,18 @@ katssdata_to_file(KatssData *data, Options *opt)
 	char kseq[32];
 	for(uint64_t i=0; i<data->num_kmers; i++) {
 		double rval = data->kmers[i].rval;
-		if(isnan(rval))
+		if(isnan(rval) && (!opt->presence && opt->bootstrap))
 			continue;
 		katss_unhash(kseq, data->kmers[i].kmer, opt->kmer, true);
-		if(opt->bootstrap) {
+		if(opt->bootstrap && !opt->presence) {
 			fprintf(opt->out_file, "%s%c%f%c%f%c%E\n", kseq, opt->delimiter,
 			  rval, opt->delimiter, data->kmers[i].stdev, opt->delimiter,
 			  data->kmers[i].pval);
+		} else if(opt->bootstrap && opt->presence) {
+			fprintf(opt->out_file, "%s%c%f%c%f\n", kseq, opt->delimiter, 
+			  rval, opt->delimiter, data->kmers[i].stdev);
+		} else if(opt->presence) {
+			fprintf(opt->out_file, "%s%c%u\n", kseq, opt->delimiter, data->kmers[i].count);
 		} else {
 			fprintf(opt->out_file, "%s%c%f\n", kseq, opt->delimiter, rval);
 		}
