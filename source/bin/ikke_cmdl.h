@@ -65,6 +65,8 @@ struct ikke_args_info
   const char *no_log_help; /**< @brief Don't normalize enrichments to log2. help description.  */
   int enrichments_flag;	/**< @brief Compute the regular enrichments. (default=off).  */
   const char *enrichments_help; /**< @brief Compute the regular enrichments. help description.  */
+  int presence_flag;	/**< @brief Compute the presence of k-mers in all sequences (default=off).  */
+  const char *presence_help; /**< @brief Compute the presence of k-mers in all sequences help description.  */
   int shuffle_flag;	/**< @brief Shuffle the sequences while preserving k-let count. (default=off).  */
   const char *shuffle_help; /**< @brief Shuffle the sequences while preserving k-let count. help description.  */
   int klet_arg;	/**< @brief Specify the k-let to be used by ushuffle (default='-1').  */
@@ -94,6 +96,7 @@ struct ikke_args_info
   unsigned int delimiter_given ;	/**< @brief Whether delimiter was given.  */
   unsigned int no_log_given ;	/**< @brief Whether no-log was given.  */
   unsigned int enrichments_given ;	/**< @brief Whether enrichments was given.  */
+  unsigned int presence_given ;	/**< @brief Whether presence was given.  */
   unsigned int shuffle_given ;	/**< @brief Whether shuffle was given.  */
   unsigned int klet_given ;	/**< @brief Whether klet was given.  */
   unsigned int independent_probs_given ;	/**< @brief Whether independent-probs was given.  */

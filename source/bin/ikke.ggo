@@ -106,6 +106,17 @@ details="This algorithm calculates the R value from all k-mer frequencies in\
 flag
 off
 
+option "presence" P
+"Compute the presence of k-mers in all sequences"
+details="This algorithm computes the presence of all k-mers in all sequences. A\
+ k-mer is counted at most 1 time per sequence. In other words, the final number\
+ being output is the number of unique sequences the given k-mer is present in.\
+ For example, if the k-mer \"AAA\" had a count of 0, that means that the \"AAA\"\
+ k-mer was not present in any of the sequences. If the k-mer \"AAA\" had a count\
+ of 100, that means the \"AAA\" k-mer was found in 100 unique sequences.\n"
+flag
+off
+
 option "shuffle" s
 "Shuffle the sequences while preserving k-let count."
 details=""

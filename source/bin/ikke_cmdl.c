@@ -58,6 +58,8 @@ const char *ikke_args_info_detailed_help[] = {
   "  Select additional algorithms to determine the calculations.\n",
   "  -R, --enrichments        Compute the regular enrichments.  (default=off)",
   "  This algorithm calculates the R value from all k-mer frequencies in the given\n  files.\n",
+  "  -P, --presence           Compute the presence of k-mers in all sequences\n                             (default=off)",
+  "  This algorithm computes the presence of all k-mers in all sequences. A k-mer\n  is counted at most 1 time per sequence. In other words, the final number\n  being output is the number of unique sequences the given k-mer is present in.\n  For example, if the k-mer \"AAA\" had a count of 0, that means that the\n  \"AAA\" k-mer was not present in any of the sequences. If the k-mer \"AAA\"\n  had a count of 100, that means the \"AAA\" k-mer was found in 100 unique\n  sequences.\n",
   "  -s, --shuffle            Shuffle the sequences while preserving k-let count.\n                             (default=off)",
   "  ",
   "      --klet=INT           Specify the k-let to be used by ushuffle\n                             (default=`-1')",
@@ -98,11 +100,12 @@ init_help_array(void)
   ikke_args_info_help[19] = ikke_args_info_detailed_help[31];
   ikke_args_info_help[20] = ikke_args_info_detailed_help[33];
   ikke_args_info_help[21] = ikke_args_info_detailed_help[35];
-  ikke_args_info_help[22] = 0; 
+  ikke_args_info_help[22] = ikke_args_info_detailed_help[37];
+  ikke_args_info_help[23] = 0; 
   
 }
 
-const char *ikke_args_info_help[23];
+const char *ikke_args_info_help[24];
 
 typedef enum {ARG_NO
   , ARG_FLAG
@@ -138,6 +141,7 @@ void clear_given (struct ikke_args_info *args_info)
   args_info->delimiter_given = 0 ;
   args_info->no_log_given = 0 ;
   args_info->enrichments_given = 0 ;
+  args_info->presence_given = 0 ;
   args_info->shuffle_given = 0 ;
   args_info->klet_given = 0 ;
   args_info->independent_probs_given = 0 ;
@@ -166,6 +170,7 @@ void clear_args (struct ikke_args_info *args_info)
   args_info->delimiter_orig = NULL;
   args_info->no_log_flag = 0;
   args_info->enrichments_flag = 0;
+  args_info->presence_flag = 0;
   args_info->shuffle_flag = 0;
   args_info->klet_arg = -1;
   args_info->klet_orig = NULL;
@@ -196,12 +201,13 @@ void init_args_info(struct ikke_args_info *args_info)
   args_info->delimiter_help = ikke_args_info_detailed_help[17] ;
   args_info->no_log_help = ikke_args_info_detailed_help[19] ;
   args_info->enrichments_help = ikke_args_info_detailed_help[23] ;
-  args_info->shuffle_help = ikke_args_info_detailed_help[25] ;
-  args_info->klet_help = ikke_args_info_detailed_help[27] ;
-  args_info->independent_probs_help = ikke_args_info_detailed_help[29] ;
-  args_info->bootstrap_help = ikke_args_info_detailed_help[31] ;
-  args_info->sample_help = ikke_args_info_detailed_help[33] ;
-  args_info->seed_help = ikke_args_info_detailed_help[35] ;
+  args_info->presence_help = ikke_args_info_detailed_help[25] ;
+  args_info->shuffle_help = ikke_args_info_detailed_help[27] ;
+  args_info->klet_help = ikke_args_info_detailed_help[29] ;
+  args_info->independent_probs_help = ikke_args_info_detailed_help[31] ;
+  args_info->bootstrap_help = ikke_args_info_detailed_help[33] ;
+  args_info->sample_help = ikke_args_info_detailed_help[35] ;
+  args_info->seed_help = ikke_args_info_detailed_help[37] ;
   
 }
 
@@ -369,6 +375,8 @@ ikke_cmdline_parser_dump(FILE *outfile, struct ikke_args_info *args_info)
     write_into_file(outfile, "no-log", 0, 0 );
   if (args_info->enrichments_given)
     write_into_file(outfile, "enrichments", 0, 0 );
+  if (args_info->presence_given)
+    write_into_file(outfile, "presence", 0, 0 );
   if (args_info->shuffle_given)
     write_into_file(outfile, "shuffle", 0, 0 );
   if (args_info->klet_given)
@@ -1250,6 +1258,7 @@ ikke_cmdline_parser_internal (
         { "delimiter",	1, NULL, 'd' },
         { "no-log",	0, NULL, 0 },
         { "enrichments",	0, NULL, 'R' },
+        { "presence",	0, NULL, 'P' },
         { "shuffle",	0, NULL, 's' },
         { "klet",	1, NULL, 0 },
         { "independent-probs",	0, NULL, 'p' },
@@ -1264,7 +1273,7 @@ ikke_cmdline_parser_internal (
       custom_opterr = opterr;
       custom_optopt = optopt;
 
-      c = custom_getopt_long (argc, argv, "hVt:c:o:k:i:d:Rspb::", long_options, &option_index);
+      c = custom_getopt_long (argc, argv, "hVt:c:o:k:i:d:RPspb::", long_options, &option_index);
 
       optarg = custom_optarg;
       optind = custom_optind;
@@ -1363,6 +1372,16 @@ ikke_cmdline_parser_internal (
           if (update_arg((void *)&(args_info->enrichments_flag), 0, &(args_info->enrichments_given),
               &(local_args_info.enrichments_given), optarg, 0, 0, ARG_FLAG,
               check_ambiguity, override, 1, 0, "enrichments", 'R',
+              additional_error))
+            goto failure;
+        
+          break;
+        case 'P':	/* Compute the presence of k-mers in all sequences.  */
+        
+        
+          if (update_arg((void *)&(args_info->presence_flag), 0, &(args_info->presence_given),
+              &(local_args_info.presence_given), optarg, 0, 0, ARG_FLAG,
+              check_ambiguity, override, 1, 0, "presence", 'P',
               additional_error))
             goto failure;
         
