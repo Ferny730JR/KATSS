@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include "counter.h"
 #include "katss.h"
-#include "katss_core.h"
 #include "katss_helpers.h"
 #include "memory_utils.h"
 
@@ -258,15 +258,18 @@ bootstrap_regular(const char *test, const char *ctrl, KatssOptions *opts)
 		for(uint64_t k=0; k<total; k++) {
 			katss_get_from_hash(test_counts, KATSS_DOUBLE, &test_val, (uint32_t)k);
 			katss_get_from_hash(ctrl_counts, KATSS_DOUBLE, &ctrl_val, (uint32_t)k);
-			test_val = test_val == 0 ? NAN : test_val;
-			ctrl_val = ctrl_val == 0 ? NAN : ctrl_val;
 
 			/* Update the t-test aggregate */
 			t_test2_update(ttest2[k], test_val, ctrl_val);
 
 			/* Use unused df and pval to be able to store rval stdev */
-			if(!isnan(test_val) && !isnan(ctrl_val))
+			if(test_val == 0 || ctrl_val == 0) {
+				running_stdev(0, &ttest2[k]->df, &ttest2[k]->pval, i+1);
+			} else {
+				test_val /= katss_get_total(test_counts);
+				ctrl_val /= katss_get_total(ctrl_counts);
 				running_stdev(test_val/ctrl_val, &ttest2[k]->df, &ttest2[k]->pval, i+1);
+			}
 		}
 
 		/* Free the counters */
@@ -345,7 +348,11 @@ bootstrap_probs(const char *test, KatssOptions *opts)
 			/* Use unused df and pval to be able to store rval stdev */
 			test_val /= katss_get_total(test_counts); // normalize the test_val
 			ctrl_val = katss_predict_kmer_freq((uint32_t)k, kmer, mono_counts, dint_counts);
-			running_stdev(test_val/ctrl_val, &ttest2[k]->df, &ttest2[k]->pval, i+1);
+			if(test_val == 0.0 || ctrl_val == 0.0 || isnan(test_val) || isnan(ctrl_val)) {
+				running_stdev(0, &ttest2[k]->df, &ttest2[k]->pval, i+1);
+			} else {
+				running_stdev(test_val/ctrl_val, &ttest2[k]->df, &ttest2[k]->pval, i+1);
+			}
 		}
 
 		/* Free the counters */
@@ -401,8 +408,8 @@ bootstrap_ushuffle(const char *test, KatssOptions *opts)
 	int klet                  = opts->probs_ntprec;
 	int sample                = opts->bootstrap_sample;
 	bool normalize            = opts->normalize;
-	unsigned int seed1,seed2,seed3;
-	seed1 = seed2 = seed3 = opts->seed;
+	unsigned int seed1,seed2;
+	seed1 = seed2 = opts->seed;
 
 	/* Create T-test aggregates */
 	uint64_t total = 1ULL << (2*opts->kmer);
@@ -429,10 +436,13 @@ bootstrap_ushuffle(const char *test, KatssOptions *opts)
 			/* Update the t-test aggregate */
 			t_test2_update(ttest2[k], test_count, ctrl_count);
 
-			/* Use unused df and pval to be able to store rval stdev */
-			test_count /= katss_get_total(test_counts);
-			ctrl_count /= katss_get_total(shuf_counts);
-			running_stdev(test_count/ctrl_count, &ttest2[k]->df, &ttest2[k]->pval, i);
+			/* Check that the counts are greater than 0 */
+			if(test_count == 0 || ctrl_count == 0) {
+				running_stdev(0, &ttest2[k]->df, &ttest2[k]->pval, i);
+			} else {
+				/* Use unused df and pval to store rval and stdev, respectively*/
+				running_stdev(test_count/ctrl_count, &ttest2[k]->df, &ttest2[k]->pval, i);
+			}
 		}
 
 		/* Free the counters */
@@ -546,7 +556,11 @@ bootstrap_both(const char *test, KatssOptions *opts)
 			t_test2_update(ttest2[k], test_rval, ctrl_rval);
 
 			/* Store the standard deviation for R value */
-			running_stdev(test_rval/ctrl_rval, &ttest2[k]->df, &ttest2[k]->pval, i);
+			if(isnan(test_rval) || test_rval == 0 || isnan(ctrl_rval) || ctrl_rval == 0) {
+				running_stdev(0, &ttest2[k]->df, &ttest2[k]->pval, i);
+			} else {
+				running_stdev(test_rval/ctrl_rval, &ttest2[k]->df, &ttest2[k]->pval, i);
+			}
 		}
 
 		/* Free the enrichments */
