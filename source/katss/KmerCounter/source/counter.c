@@ -20,6 +20,7 @@
 #include "ushuffle.h"
 #include "seqfile.h"
 #include "thread_safe_rand.h"
+#include "katss_core.h"
 #define BUFFER_SIZE 65536U
 
 struct threadinfo {
@@ -177,6 +178,7 @@ katss_count_kmers_bootstrap(const char *filename, unsigned int kmer,
 	while(seqfgets_unlocked(read_file, buffer, BUFFER_SIZE)) {
 		if(rand_r(seed) % 100000 >= sample)
 			continue;
+		hasher->has_previous = false;
 		katss_set_seq(hasher, buffer);
 		while(katss_get_fh(hasher, &hash_value)) {
 			katss_increment(counter, hash_value);
@@ -219,6 +221,7 @@ count_file_bootstrap_mt(void *arg)
 	while(seqfgets(args->seqfile, buffer, BUFFER_SIZE)) {
 		if(thread_safe_rand_r(tsr, args->seed) % 100000 >= args->sample)
 			continue;
+		hasher->has_previous = false;
 		katss_set_seq(hasher, buffer);
 		while(katss_get_fh(hasher, &hash_values[cur_hash])) {
 			if(++cur_hash == num_counts) { // begin flushing
@@ -369,6 +372,7 @@ katss_count_kmers_ushuffle(const char *filename, unsigned int kmer, int klet)
 		int seqlen = strlen(buffer);
 		shuffle(buffer, shuf, seqlen, klet);
 		shuf[seqlen] = '\0';
+		hasher->has_previous = false;
 		katss_set_seq(hasher, shuf);
 		while(katss_get_fh(hasher, &hash_value)) {
 			katss_increment(counter, hash_value);
@@ -445,6 +449,7 @@ katss_count_kmers_ushuffle_bootstrap(const char *filename, unsigned int kmer,
 		int seqlen = strlen(buffer);
 		shuffle(buffer, shuf, strlen(buffer), klet);
 		shuf[seqlen] = '\0'; // add null terminator since shuffle uses strncpy
+		hasher->has_previous = false;
 		katss_set_seq(hasher, shuf);
 		while(katss_get_fh(hasher, &hash_value)) {
 			katss_increment(counter, hash_value);
