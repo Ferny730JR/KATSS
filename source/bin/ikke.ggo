@@ -4,7 +4,7 @@ purpose "RNA motif discovery tool"
 
 usage "ikke -t [test] -c [control] [OPTIONS]"
 
-version "1.0"
+version "1.1"
 
 args "--file-name=ikke_cmdl --include-getopt --default-optional\
  --func-name=ikke_cmdline_parser --arg-struct-name=ikke_args_info"

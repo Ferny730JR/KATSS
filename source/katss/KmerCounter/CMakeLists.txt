@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10.0)
 project(KatssKmerCounter
-	VERSION 0.9.0
+	VERSION 1.1.0
 	DESCRIPTION "K-mer counting function utilities."
 	LANGUAGES C)
 

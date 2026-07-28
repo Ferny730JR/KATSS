@@ -31,7 +31,7 @@ extern "C" {
 
 #ifndef IKKE_CMDLINE_PARSER_VERSION
 /** @brief the program version */
-#define IKKE_CMDLINE_PARSER_VERSION "1.0"
+#define IKKE_CMDLINE_PARSER_VERSION "1.1"
 #endif
 
 /** @brief Where the command line options are stored */
